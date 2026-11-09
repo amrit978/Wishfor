@@ -256,3 +256,63 @@ button, a, input, textarea, select {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.30);
 }
+
+/* Loading & Sanctuary Atmosphere Animations */
+@keyframes beamSweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+@keyframes gentleBreath {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.92;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+}
+
+@keyframes orbitRotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes auraGlow {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.08);
+  }
+}
+
+.animate-beam-sweep {
+  animation: beamSweep 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.animate-gentle-breath {
+  animation: gentleBreath 3s ease-in-out infinite;
+}
+
+.animate-orbit-rotate {
+  animation: orbitRotate 20s linear infinite;
+}
+
+.animate-aura-glow {
+  animation: auraGlow 4s ease-in-out infinite;
+}
