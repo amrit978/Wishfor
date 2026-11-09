@@ -33,9 +33,9 @@ export function SanctuaryPageLoader() {
       }
     }
 
-    // 3. Smooth 0% -> 100% counter running over ~1.3 seconds
+    // 3. Smooth 0% -> 100% counter running over ~1.6 seconds
     const startTime = performance.now();
-    const duration = 1250; // 1.25s runtime
+    const duration = 1600; // 1.6s smooth runtime
     let frameId: number;
 
     const tick = (currentTime: number) => {
@@ -43,7 +43,7 @@ export function SanctuaryPageLoader() {
       const progressFraction = Math.min(elapsed / duration, 1);
 
       // Smooth ease-out curve
-      const eased = 1 - Math.pow(1 - progressFraction, 2.8);
+      const eased = 1 - Math.pow(1 - progressFraction, 2.5);
       const percent = Math.min(Math.round(eased * 100), 100);
 
       setProgress(percent);
@@ -56,8 +56,8 @@ export function SanctuaryPageLoader() {
           setIsOpening(true);
           setTimeout(() => {
             setIsVisible(false);
-          }, 700); // 700ms smooth curtain dissolve
-        }, 120);
+          }, 750); // 750ms smooth curtain dissolve
+        }, 180);
       }
     };
 
