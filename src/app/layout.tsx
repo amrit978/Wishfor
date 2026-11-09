@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Header } from '@/components/Header';
 import { PersistentNav } from '@/components/PersistentNav';
+import { SanctuaryPageLoader } from '@/components/SanctuaryPageLoader';
 
 export const metadata: Metadata = {
   title: 'WishFor — Anonymous Peer Community',
@@ -42,6 +43,7 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased selection:bg-[#e5ab37] selection:text-[#13151f] min-h-screen bg-[#13151f] text-[#f2f2f5] overflow-x-hidden">
+        <SanctuaryPageLoader />
         <Header />
         {children}
         <PersistentNav />
