@@ -354,7 +354,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                       type="tel"
                       value={phoneNumber}
                       onChange={(e) => setPhoneNumber(e.target.value.replace(/[^\d]/g, ''))}
-                      placeholder="9876543210"
+                      placeholder=""
                       autoComplete="off"
                       className="input-underlined w-full text-[17px] font-mono tracking-wider"
                       autoFocus
