@@ -10,63 +10,43 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: {
-          950: "#090c10",
-          900: "#0e131b",
-          850: "#131923",
-          800: "#18202d",
-          700: "#222c3e",
-          600: "#2f3c53",
-          500: "#445370",
-          400: "#697b9e",
-          300: "#98a6c2",
-          200: "#c7d1e3",
-          100: "#e5ebf5",
+        navy: {
+          950: "#0c0d14", // Split page content dark
+          900: "#13151f", // Base page background
+          850: "#141a33", // Split page left textured navy
+          800: "#1c223d",
         },
-        candle: {
-          50: "#fdf8ec",
-          100: "#faefcf",
-          200: "#f5dda0",
-          300: "#eec66a",
-          400: "#e5ab37",
-          500: "#d39424",
-          600: "#b5731b",
-          700: "#905318",
-          800: "#764319",
-          900: "#643818",
+        editorial: {
+          white: "#f2f2f5", // Headlines, active items
+          body: "#aab0c4",  // Reading body text
+          muted: "#7c8299", // Labels, inactive nav, timestamps
+          hairline: "rgba(255, 255, 255, 0.10)",
+          border: "rgba(255, 255, 255, 0.28)",
+          borderHover: "rgba(255, 255, 255, 0.60)",
         },
-        parchment: {
-          50: "#fdfcf9",
-          100: "#faf6ee",
-          200: "#f3ecdc",
-          300: "#e8dcbe",
-          400: "#d9c59c",
-          500: "#c7ad7c",
-          600: "#a98d5f",
-          700: "#866e4a",
-          800: "#6c583e",
-          900: "#594834",
+        category: {
+          pink: "#e2869a",
+          amber: "#e5ab37",
+          green: "#7ec89f",
+          cyan: "#68b9d0",
+          violet: "#a78bfa",
         },
       },
       fontFamily: {
-        serif: ["Lora", "Fraunces", "Georgia", "serif"],
-        sans: ["Nunito", "Plus Jakarta Sans", "system-ui", "sans-serif"],
+        serif: ["var(--font-serif)", "Newsreader", "Georgia", "serif"],
+        sans: ["var(--font-sans)", "Figtree", "system-ui", "sans-serif"],
       },
-      keyframes: {
-        flicker: {
-          "0%, 100%": { opacity: "1", transform: "scale(1)" },
-          "25%": { opacity: "0.85", transform: "scale(0.98) translateY(0.5px)" },
-          "50%": { opacity: "1", transform: "scale(1.02) translateY(-0.5px)" },
-          "75%": { opacity: "0.9", transform: "scale(0.99)" },
-        },
-        shimmer: {
-          "0%": { backgroundPosition: "-200% 0" },
-          "100%": { backgroundPosition: "200% 0" },
-        },
+      letterSpacing: {
+        widestplus: "0.22em",
+        tightplus: "-0.015em",
       },
-      animation: {
-        flicker: "flicker 3.5s ease-in-out infinite",
-        "flicker-fast": "flicker 1.8s ease-in-out infinite",
+      lineHeight: {
+        editorialTight: "0.92",
+        headingTight: "0.98",
+        bodyLoose: "1.75",
+      },
+      boxShadow: {
+        glow: "0 0 60px rgba(78, 115, 223, 0.08)",
       },
     },
   },
@@ -74,4 +54,3 @@ const config: Config = {
 };
 
 export default config;
-

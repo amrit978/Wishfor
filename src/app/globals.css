@@ -1,53 +1,241 @@
-@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..600;1,400..600&family=Plus+Jakarta+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  /* Exact Overworld Audio color system */
-  --off-black: #13151f;
-  --bg-deep: #0e1017;
-  --surface: #1a1c28;
-  --off-white: #e9ecee;
-  --color-secondary: #aab9c7;
-  --gray: #6e8799;
-  --dark-gray: #4c5e6b;
-  --border: rgba(233, 236, 238, 0.08);
-  --border-hover: rgba(233, 236, 238, 0.2);
-  --accent: #e5ab37;
+  --bg-page: #13151f;
+  --bg-split-content: #0c0d14;
+  --bg-split-panel: #141a33;
+  --text-headline: #f2f2f5;
+  --text-body: #aab0c4;
+  --text-muted: #7c8299;
+  --hairline: rgba(255, 255, 255, 0.10);
+  --border-outline: rgba(255, 255, 255, 0.28);
+  --border-outline-hover: rgba(255, 255, 255, 0.60);
+  --ease-editorial: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background-color: var(--off-black);
-  color: var(--off-white);
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-page);
+  color: var(--text-body);
+  font-family: 'Figtree', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
   margin: 0;
   padding: 0;
   overflow-x: hidden;
+  position: relative;
 }
 
-h1, h2, h3, h4, .font-serif {
-  font-family: 'Lora', Georgia, serif;
+/* Big editorial serif */
+h1, h2, h3, .font-serif {
+  font-family: 'Newsreader', Georgia, serif;
+  letter-spacing: -0.015em;
 }
 
-.font-mono {
-  font-family: 'JetBrains Mono', monospace;
+/* Clean geometric sans */
+.font-sans, p, input, textarea, button, nav, span {
+  font-family: 'Figtree', system-ui, sans-serif;
 }
 
-/* Subtle Overworld Audio noise grain */
-body::before {
+/* Eyebrow and tracking utilities */
+.eyebrow-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+/* Film-grain noise overlay (covers every page, 6% opacity, pointer-events: none) */
+body::after {
   content: '';
   position: fixed;
   inset: 0;
+  width: 100vw;
+  height: 100vh;
   pointer-events: none;
-  background-image: 
-    radial-gradient(rgba(233, 236, 238, 0.03) 1px, transparent 1px);
-  background-size: 28px 28px;
+  z-index: 99;
+  opacity: 0.06;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* Soft blue radial glow behind main content */
+.radial-content-glow {
+  position: fixed;
+  top: 35%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 75vw;
+  height: 60vh;
+  max-width: 1100px;
+  background: radial-gradient(ellipse at center, rgba(35, 55, 115, 0.14) 0%, rgba(19, 21, 31, 0) 70%);
+  pointer-events: none;
   z-index: 1;
+}
+
+/* OUTLINE-ONLY BUTTON SPEC */
+@layer components {
+  .btn-outline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 50px;
+    padding: 0 28px;
+    border: 1px solid var(--border-outline);
+    border-radius: 2px;
+    background: transparent !important;
+    color: var(--text-headline);
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    cursor: pointer;
+    outline: none;
+    position: relative;
+    transition: all 300ms var(--ease-editorial);
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  .btn-outline:hover,
+  .btn-outline:focus-visible {
+    border-color: var(--border-outline-hover);
+    color: #ffffff;
+    outline: 1px dashed rgba(255, 255, 255, 0.40);
+    outline-offset: 4px;
+    transform: translateY(-1.5px);
+  }
+
+  .btn-outline:active {
+    transform: translateY(0.5px) scale(0.99);
+  }
+
+  .btn-outline:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    outline: none !important;
+    transform: none !important;
+  }
+}
+
+/* Universal smooth transitions on interactive controls */
+button, a, input, textarea, select {
+  transition: all 250ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* UNDERLINED TEXTAREA */
+.textarea-underlined {
+  width: 100%;
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.25) !important;
+  border-radius: 0 !important;
+  padding: 14px 0 !important;
+  color: var(--text-headline) !important;
+  font-family: 'Figtree', system-ui, sans-serif !important;
+  font-size: 17px !important;
+  line-height: 1.75 !important;
+  outline: none !important;
+  resize: vertical;
+  transition: border-color 280ms var(--ease-editorial);
+}
+
+.textarea-underlined:focus {
+  border-bottom-color: rgba(255, 255, 255, 0.65) !important;
+}
+
+.textarea-underlined::placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+/* UNDERLINED INPUT */
+.input-underlined {
+  width: 100%;
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.25) !important;
+  border-radius: 0 !important;
+  padding: 12px 0 !important;
+  color: var(--text-headline) !important;
+  font-family: 'Figtree', system-ui, sans-serif !important;
+  font-size: 17px !important;
+  outline: none !important;
+  transition: border-color 280ms var(--ease-editorial);
+}
+
+.input-underlined:focus {
+  border-bottom-color: rgba(255, 255, 255, 0.65) !important;
+}
+
+.input-underlined::placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+/* Category pill filter buttons */
+.pill-filter {
+  padding: 7px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 9999px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+  transition: all 280ms var(--ease-editorial);
+}
+
+.pill-filter:hover {
+  border-color: rgba(255, 255, 255, 0.40);
+  color: var(--text-headline);
+  transform: translateY(-1px);
+}
+
+.pill-filter.active {
+  border-color: rgba(255, 255, 255, 0.70);
+  color: #ffffff;
+}
+
+/* Tab and Section Transitions */
+.tab-pane-transition {
+  animation: tabFadeIn 320ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes tabFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Page fade and 12px upward drift */
+.page-fade-drift {
+  animation: pageDrift 450ms var(--ease-editorial) forwards;
+}
+
+@keyframes pageDrift {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Minimalist scrollbars */
@@ -61,10 +249,10 @@ body::before {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--dark-gray);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--gray);
+  background: rgba(255, 255, 255, 0.30);
 }

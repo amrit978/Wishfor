@@ -7,14 +7,14 @@ import { checkDoxxing, detectCrisis } from './safety';
 import { soundEngine } from './soundscape';
 
 const STORAGE_KEYS = {
-  POSTS: 'wishfor_posts_v4',
-  REPLIES: 'wishfor_replies_v4',
-  CURRENT_USER: 'wishfor_user_v4',
-  BOOKMARKS: 'wishfor_bookmarks_v4',
-  NOTIFICATIONS: 'wishfor_notifs_v4',
-  REPORTS: 'wishfor_reports_v4',
-  LIKED_REPLIES: 'wishfor_likes_v4',
-  LAST_POST_TIME: 'wishfor_last_post_v4',
+  POSTS: 'wishfor_posts_v5',
+  REPLIES: 'wishfor_replies_v5',
+  CURRENT_USER: 'wishfor_user_v5',
+  BOOKMARKS: 'wishfor_bookmarks_v5',
+  NOTIFICATIONS: 'wishfor_notifs_v5',
+  REPORTS: 'wishfor_reports_v5',
+  LIKED_REPLIES: 'wishfor_likes_v5',
+  LAST_POST_TIME: 'wishfor_last_post_v5',
 };
 
 class CommunityStore {
@@ -22,9 +22,30 @@ class CommunityStore {
     return typeof window !== 'undefined';
   }
 
+  public isAuthenticated(): boolean {
+    if (!this.isBrowser()) return false;
+    const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+    if (!saved) return false;
+    try {
+      const user: CurrentUser = JSON.parse(saved);
+      return Boolean(user && user.is_authenticated && (user.email || user.phone));
+    } catch (e) {
+      return false;
+    }
+  }
+
   public getCurrentUser(): CurrentUser {
+    const fallback: CurrentUser = {
+      id: 'anon_guest',
+      trust_score: 0,
+      trust_level: 'Newcomer',
+      role: 'user',
+      is_banned: false,
+      is_authenticated: false,
+    };
+
     if (!this.isBrowser()) {
-      return INITIAL_USERS[0];
+      return fallback;
     }
     const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
     if (saved) {
@@ -34,10 +55,11 @@ class CommunityStore {
     }
     const newUser: CurrentUser = {
       id: `anon_${Math.random().toString(36).substring(2, 10)}`,
-      trust_score: 12,
-      trust_level: 'Listener',
+      trust_score: 0,
+      trust_level: 'Newcomer',
       role: 'user',
       is_banned: false,
+      is_authenticated: false,
     };
     this.saveCurrentUser(newUser);
     return newUser;
@@ -45,22 +67,72 @@ class CommunityStore {
 
   public saveCurrentUser(user: CurrentUser): void {
     if (!this.isBrowser()) return;
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+    const cleanEmail = user.email ? user.email.trim().toLowerCase() : undefined;
+    const sanitized: CurrentUser = {
+      ...user,
+      email: cleanEmail,
+      is_authenticated: Boolean(user.is_authenticated ?? (cleanEmail || user.phone)),
+    };
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(sanitized));
+
+    // If logging in with email, backfill author_email on any posts/replies authored by this user
+    if (cleanEmail) {
+      try {
+        const rawPosts = this.getRawPosts();
+        let postsChanged = false;
+        const updatedPosts = rawPosts.map((p) => {
+          if ((p.author_id === sanitized.id || p.author_email?.toLowerCase() === cleanEmail) && !p.author_email) {
+            postsChanged = true;
+            return { ...p, author_email: cleanEmail, author_id: sanitized.id };
+          }
+          return p;
+        });
+        if (postsChanged) {
+          localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(updatedPosts));
+        }
+
+        const rawReplies = this.getRawReplies();
+        let repliesChanged = false;
+        const updatedReplies = rawReplies.map((r) => {
+          if ((r.author_id === sanitized.id || r.author_email?.toLowerCase() === cleanEmail) && !r.author_email) {
+            repliesChanged = true;
+            return { ...r, author_email: cleanEmail, author_id: sanitized.id };
+          }
+          return r;
+        });
+        if (repliesChanged) {
+          localStorage.setItem(STORAGE_KEYS.REPLIES, JSON.stringify(updatedReplies));
+        }
+      } catch (err) {}
+    }
+
+    this.notifyListeners();
+  }
+
+  public logout(): void {
+    if (!this.isBrowser()) return;
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    // Clear verification cookie if present
+    document.cookie = 'wishfor_otp_ticket=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    this.notifyListeners();
   }
 
   public switchRole(role: 'user' | 'moderator'): CurrentUser {
     const user = this.getCurrentUser();
     user.role = role;
-    if (role === 'moderator') {
-      user.trust_score = 150;
-      user.trust_level = 'Trusted Voice';
-    }
     this.saveCurrentUser(user);
     this.notifyListeners();
     return user;
   }
 
-  public resetToSeed(): void {
+  public seedDevData(): void {
+    if (!this.isBrowser()) return;
+    localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(INITIAL_POSTS));
+    localStorage.setItem(STORAGE_KEYS.REPLIES, JSON.stringify(INITIAL_REPLIES));
+    this.notifyListeners();
+  }
+
+  public clearAll(): void {
     if (!this.isBrowser()) return;
     localStorage.removeItem(STORAGE_KEYS.POSTS);
     localStorage.removeItem(STORAGE_KEYS.REPLIES);
@@ -72,26 +144,54 @@ class CommunityStore {
     this.notifyListeners();
   }
 
-  public getPosts(): Post[] {
-    let posts = INITIAL_POSTS;
+  private getRawPosts(): Post[] {
+    const isDevSeed = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_DEV_SEED === 'true';
+    let posts: Post[] = isDevSeed ? INITIAL_POSTS : [];
     if (this.isBrowser()) {
       const stored = localStorage.getItem(STORAGE_KEYS.POSTS);
       if (stored) {
         try {
           posts = JSON.parse(stored);
-        } catch (e) {
-          posts = INITIAL_POSTS;
-        }
+        } catch (e) {}
       }
     }
+    return posts;
+  }
+
+  private getRawReplies(): Reply[] {
+    const isDevSeed = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_DEV_SEED === 'true';
+    let replies: Reply[] = isDevSeed ? INITIAL_REPLIES : [];
+    if (!this.isBrowser()) return replies;
+    const stored = localStorage.getItem(STORAGE_KEYS.REPLIES);
+    if (!stored) return replies;
+    try {
+      return JSON.parse(stored);
+    } catch (e) {
+      return replies;
+    }
+  }
+
+  public getPosts(): Post[] {
+    const posts = this.getRawPosts();
     const bookmarks = this.getBookmarks();
+    const user = this.getCurrentUser();
+    const isAuth = this.isAuthenticated();
+    const userEmail = (user.email || '').toLowerCase().trim();
 
     return posts
-      .filter((p) => p.status === 'published' || (p.status === 'draft' && p.is_author))
-      .map((p) => ({
-        ...p,
-        is_saved: bookmarks.includes(p.id),
-      }));
+      .map((p) => {
+        const isAuthor = Boolean(
+          isAuth &&
+            ((userEmail && p.author_email && p.author_email.toLowerCase() === userEmail) ||
+              (user.id && p.author_id && p.author_id === user.id))
+        );
+        return {
+          ...p,
+          is_author: isAuthor,
+          is_saved: bookmarks.includes(p.id),
+        };
+      })
+      .filter((p) => p.status === 'published' || (p.status === 'draft' && p.is_author));
   }
 
   public savePosts(posts: Post[]): void {
@@ -168,6 +268,8 @@ class CommunityStore {
       is_asker: true,
       trust_level: user.trust_level,
       is_author: true,
+      author_id: user.id,
+      author_email: user.email ? user.email.toLowerCase().trim() : undefined,
       coordinates: `FREQ // ${freqCode.toFixed(1)}${data.is_urgent ? ' [PRIORITY]' : ''}`,
     };
 
@@ -239,14 +341,22 @@ class CommunityStore {
   }
 
   public getAllReplies(): Reply[] {
-    if (!this.isBrowser()) return INITIAL_REPLIES;
-    const stored = localStorage.getItem(STORAGE_KEYS.REPLIES);
-    if (!stored) return INITIAL_REPLIES;
-    try {
-      return JSON.parse(stored);
-    } catch (e) {
-      return INITIAL_REPLIES;
-    }
+    const replies = this.getRawReplies();
+    const user = this.getCurrentUser();
+    const isAuth = this.isAuthenticated();
+    const userEmail = (user.email || '').toLowerCase().trim();
+
+    return replies.map((r) => {
+      const isAuthor = Boolean(
+        isAuth &&
+          ((userEmail && r.author_email && r.author_email.toLowerCase() === userEmail) ||
+            (user.id && r.author_id && r.author_id === user.id))
+      );
+      return {
+        ...r,
+        is_author: isAuthor,
+      };
+    });
   }
 
   public saveReplies(replies: Reply[]): void {
@@ -260,6 +370,10 @@ class CommunityStore {
     reply?: Reply;
     error?: string;
   } {
+    if (!this.isAuthenticated()) {
+      return { success: false, error: 'Sign in to leave a suggestion.' };
+    }
+
     const user = this.getCurrentUser();
     if (user.is_banned) {
       return { success: false, error: 'Transmission capability restricted.' };
@@ -284,6 +398,12 @@ class CommunityStore {
     }
 
     const isAsker = Boolean(post.is_author);
+    if (isAsker && !parentReplyId) {
+      return {
+        success: false,
+        error: 'You are the author of this problem. You cannot submit suggestions to your own question.',
+      };
+    }
     const mask = getMaskForThread(user.id, postId, isAsker);
 
     const replyId = `reply_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
@@ -303,6 +423,8 @@ class CommunityStore {
       is_asker: isAsker,
       trust_level: user.trust_level,
       is_author: true,
+      author_id: user.id,
+      author_email: user.email ? user.email.toLowerCase().trim() : undefined,
       has_liked: false,
     };
 
@@ -413,6 +535,13 @@ class CommunityStore {
     const posts = this.getPosts();
     const post = posts.find((p) => p.id === postId);
     if (!post) return false;
+
+    // Prevent author from marking their own reply as helped
+    const allExisting = this.getAllReplies();
+    const targetReply = allExisting.find((r) => r.id === replyId);
+    if (!targetReply || targetReply.is_author) {
+      return false;
+    }
 
     const isAlreadyHelped = post.helped_reply_id === replyId;
     const newHelpedId = isAlreadyHelped ? null : replyId;

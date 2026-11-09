@@ -23,11 +23,11 @@ const CRISIS_PATTERNS = [
   /\b(suicid(e|al))\b/i,
   /\b(end\s+(my\s*life|it\s*all))\b/i,
   /\b(want\s+to\s+die)\b/i,
-  /\b(don'?t\s+want\s+to\s+(live|wake\s*up))\b/i,
+  /\b(do\s*n'?t|do\s+not|dont|don)\s+want\s+to\s+(live|exist|wake\s*up)\b/i,
   /\b(hang\s+myself|slit\s+my\s*wrist|overdose)\b/i,
   /\b(cut(ting)?\s+myself)\b/i,
   /\b(domestic\s+violence|beating\s+me|abusing\s+me\s+physically)\b/i,
-  /\b(tired\s+of\s+living)\b/i,
+  /\b(tired\s+of\s+living|no\s+reason\s+to\s+live|give\s+up\s+on\s+life)\b/i,
 ];
 
 export const CRISIS_HELPLINES = [

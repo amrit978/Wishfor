@@ -45,6 +45,8 @@ export interface Post {
   // Contextual flags
   is_saved?: boolean;
   is_author?: boolean;
+  author_id?: string;
+  author_email?: string;
   coordinates?: string;
 }
 
@@ -65,6 +67,8 @@ export interface Reply {
   trust_level: TrustLevel;
   has_liked?: boolean;
   is_author?: boolean;
+  author_id?: string;
+  author_email?: string;
   sub_replies?: Reply[];
 }
 
@@ -110,6 +114,8 @@ export interface ReportItem {
 export interface CurrentUser {
   id: string;
   email?: string;
+  phone?: string;
+  is_authenticated?: boolean;
   trust_score: number;
   trust_level: TrustLevel;
   role: 'user' | 'moderator' | 'admin';

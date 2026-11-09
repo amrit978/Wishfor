@@ -1,0 +1,116 @@
+<USER_REQUEST>
+TASK: Redesign the entire front end of my existing app "WishFor" (an anonymous peer-help community) to follow the design language described below. Do NOT change the backend, database, auth, anonymity logic, API routes or any working feature. Only restyle, restructure the layout, add the "Room" explore view, remove fake data, and rewrite copy. Before coding, list the files you will touch. Work page by page and, after each page, check it at 1920px, 1440px, 768px and 375px widths.
+
+DESIGN REFERENCE
+The look comes from a dark, cinematic, editorial studio site: deep navy, film grain, big serif headlines, tiny widely-spaced uppercase labels, hairline-bordered outline buttons, huge empty space. Copy the layout and feel only. Do not copy its logo, text, images, audio or name. Everything must be original to WishFor.
+
+1. GLOBAL LOOK
+- Page background: deep navy, about #13151f. Content-side panels on split pages go darker, about #0c0d14. The left panel on split pages is a slightly lighter, textured navy, about #141a33.
+- A film-grain noise overlay covers every page (SVG feTurbulence or a tiled noise PNG, 5-8% opacity, pointer-events none). A very soft blue radial glow sits behind the main content. Nothing else gradient-like. No glassmorphism, no drop shadows, no neon.
+- Text: white at about #f2f2f5 for headlines and active items. Body text is a dimmer blue-gray, about #aab0c4. Labels and inactive nav are dimmer still, about #7c8299. Hairlines: 1px, rgba(255,255,255,0.10).
+- Treat all colors above as eyeballed. Confirm with the eyedropper against the reference screenshots I attach and tell me any you changed.
+
+2. TYPOGRAPHY
+- Headlines, problem titles, sub-headings: an editorial serif. Use Newsreader (Google Fonts), weight 400-500, letter-spacing -0.015em, tight line height of 0.95-1.05 for big headings.
+- Body, nav, labels, buttons: a clean geometric sans. Use Figtree (Google Fonts), weight 400-500.
+- Sizes at 1920px wide:
+  - Home headline: about 52px, 3 lines, line-height 0.92.
+  - Page H1: 46-54px.
+  - List row titles: about 32px serif.
+  - Sub-headings and the featured link: 28-30px serif.
+  - Body: 17px, line-height 1.75, max width about 380px for short intro text and 560px for reading text.
+  - Eyebrow labels, nav, buttons: 12px, UPPERCASE, letter-spacing 0.22em, weight 500.
+- Load fonts with next/font, font-display swap. Verify against my screenshots and tell me if you swapped anything.
+
+3. TOP BAR (fixed on every page, no background, no border)
+- Left, 53px from the edge: a small original line-art mark (concentric thin arcs forming a lantern or mask outline, 40px, 1px stroke) followed by the wordmark "WISH" in white bold and "FOR" in dim, uppercase and widely tracked, like a two-tone wordmark.
+- Center: three uppercase tracked text links: PROBLEMS, MY SPACE, ABOUT. The active one is bright white, the others are dim. Hover brightens. Transition 250ms.
+- Right, 50px from the edge: a 34px circular outline button (1px border) holding a small chevron. Clicking it opens a tiny dropdown with: Sound on/off (ambient night sound, off by default, remembered), Language (English / हिन्दी), and Sign out. The chevron rotates when open.
+- Header height about 140px of clear space, with the logo and nav vertically centered at about y=70.
+
+4. BUTTONS
+- Outline only: 1px border rgba(255,255,255,0.28), radius 2px, height 50px, horizontal padding 28px, uppercase tracked 12px text, optional 12px icon before the label (a play triangle, a list icon or a left arrow).
+- Hover and focus: border brightens to about 0.6 opacity and a second dashed outline appears 4px outside the first. Never a filled button, with one exception: none. Keep everything outline.
+- Persistent bottom-left button on every inner page: "← BACK TO THE ROOM", 53px from the left and 45px from the bottom.
+- On long pages, show a thin 1px vertical scroll indicator line, about 100px tall, bottom-right, 46px from the edge.
+
+5. HOME PAGE (full-bleed, no scrolling)
+- Full-viewport atmospheric background: a dark, misty night scene in blue-teal with small glowing lights scattered in it, darkened at the edges with a vignette. The app must load it from /public/bg/room.webp (or room.webm for video) and fall back to a CSS and canvas fog effect if the file is missing. I will supply my own background image. Do not use any image from the reference site.
+- Headline, left-aligned at about 11% from the left and 24% from the top, serif, 3 lines: "Say what's / on your mind. / No one will know it's you."
+- Bottom-left outline button with a list icon: "BROWSE ALL PROBLEMS" → /problems.
+- Bottom-right, right-aligned, two lines, 13px, dim: "Drag or scroll to look around. / Click a light to read it." On mobile: "Drag to look around. / Tap a light to read it."
+- Nothing else on screen. No feature lists, no stats, no testimonials.
+
+6. THE ROOM (explore canvas on the home page)
+- The background is a draggable, scrollable canvas with momentum. Each real, open problem is a small glowing light (6-10px core with a soft halo) at an irregular, organic position. Never a grid.
+- Light color follows the category, using five muted tones: soft pink, amber, green, cyan, violet. Brightness and size grow with reply count. Unanswered problems pulse softly (4-5s cycle).
+- Hover or tap a light: a small outlined tooltip with the problem's title in serif and "N replies". Click opens the problem in a right-side panel using the split-layout style below, or navigates to the problem page on mobile.
+- Only render lights near the viewport, and lazy-load more as the user pans, so it stays smooth on cheap phones. Respect prefers-reduced-motion by turning off drift and pulse.
+- If there are zero problems, show an honest empty state (see section 11), not fake lights.
+
+7. PROBLEMS LIST PAGE (/problems), styled like a project list
+- Centered column about 1200px wide (cap it at 90% on small screens). Above the list, small tracked tabs for sorting: LATEST, MOST HELPED, UNANSWERED, plus a category filter.
+- Each row is about 117px tall with a 1px hairline divider below, and has four columns:
+  1. Problem title, serif 32px, single line, truncated with an ellipsis.
+  2. How long ago, in plain words ("2 hours ago"), sans 18px, dim.
+  3. Category, sans 18px, dim.
+  4. Right-aligned outline button: "READ · 12" (the number is the real reply count).
+- Row hover: title brightens, the button border brightens, the row shifts 4px right. No cards, no shadows, no icons per row.
+- On mobile each row stacks: title on top, then time and category beneath, with the button below. Keep the hairlines.
+
+8. SPLIT-LAYOUT PAGES (problem detail, share a problem, about, my space, guidelines)
+- Left 38% of the screen is a decorative textured navy panel, with a visible vertical boundary at 38%. It holds no text, only the grain and a faint glow. On the problem page, the glow takes the problem's category color. On mobile this panel collapses to a 120px strip at the top.
+- Right side: the content column starts 88px after the boundary. Layout: tiny tracked eyebrow label (e.g. "PROBLEM" or "SHARE"), then a big serif H1, then body text, then further sections each with their own eyebrow label.
+- Two-column blocks (for "How it works" on About) use a 400px column, a 60px gap, serif 28px sub-headings, and 17px body text.
+- Problem detail: the asker's text in 17px body, below it the eyebrow "REPLIES", then each reply: mask name in tracked uppercase 12px (plus a small trust badge word like LISTENER or GUIDE), the reply text, then a small outline like button with the real count. Replies are sorted by likes, highest first. The one marked "This helped me" sits on top with a small label "HELPED THE ASKER". The reply box at the bottom is an underlined textarea (1px dashed bottom border only, no box) with an outline SEND button.
+- Share a problem page: eyebrow "SHARE", H1 "What's weighing on you?", an underlined textarea, a category selector shown as outline pill buttons, an "urgent" toggle, and an outline "POST IT" button. Show a quiet line: "Your name is never shown. Not to anyone."
+- My Space: three tabs in tracked uppercase (MY PROBLEMS, MY REPLIES, SAVED) using the same list-row style as /problems.
+
+9. MOTION
+- Easing 300-600ms, cubic-bezier(0.22, 1, 0.36, 1). Fade and slight upward drift (12px) on page enter. Momentum on canvas drag. No bounce, confetti, parallax or auto-playing carousels.
+
+10. RESPONSIVE
+- Mobile first. At 375px, nothing overflows, tap targets are 44px or more, the top bar collapses to the logo and the circular button, and the nav links move into the dropdown. Test at 1920, 1440, 768 and 375 and show me screenshots.
+
+11. REMOVE ALL FAKE DATA
+- Delete every piece of placeholder content from the UI and the production build: seed posts and replies, fake usernames, fake avatars or stock photos, lorem ipsum, hardcoded counts like "10,000+ users", fake testimonials, fake trust scores and fake notifications. Search the whole codebase for mock arrays, faker or seed imports and "John Doe"-style text.
+- Everything shown must come from the real database. If a seed script is needed for development, keep it out of the app bundle, behind a DEV_SEED=true flag that is off by default, and never run it in production.
+- Show honest empty states in a human voice, for example:
+  - No problems yet: "The room is quiet tonight. Be the first to say something."
+  - No replies: "No one has answered yet. You could be the first."
+  - Empty My Space: "Nothing here yet. Whatever you share stays between you and the mask."
+  - Never show a made-up number. Show real counts, or show nothing.
+
+12. HUMAN COPY (write every line by hand)
+- Short, warm, plain, like a kind friend talking late at night. A little Hinglish where natural ("Kuch kehna hai? Yahan kaho.", "Aap akele nahi ho."), but never forced. Sentence case, no exclamation marks, no emojis.
+- Banned words: revolutionize, seamless, empower, unlock, journey, community-driven, cutting-edge, "welcome to the future".
+- Write specific messages for errors, loading, success and rate limits. For example: "That didn't go through. Try once more?", not "An error occurred."
+- Keep the small disclaimer: "Advice here comes from people like you, not professionals."
+- Keep the safety card for self-harm signals, with Tele-MANAS 14416 and 112, shown gently, styled to match (outline, serif sentence, no red alert box).
+
+13. DO NOT BREAK ANYTHING
+- Anonymity: the UI must never show an email, phone, real name or IP anywhere. Masks rotate per thread as already built.
+- Auth, posting, replying, liking, trust points, reporting, notifications and the moderation panel must work exactly as before.
+- No new dependencies unless needed. Tell me about each one.
+
+14. FINAL CHECKLIST (verify each item and report it back as done or not done)
+- Grain overlay on every page, no gradients other than the soft glow.
+- Serif and sans fonts match the spec and are loaded without layout shift.
+- All buttons are outline-only with the dashed hover ring.
+- The bottom-left "BACK TO THE ROOM" button and the right scroll line appear on inner pages.
+- Home has no extra content and the Room canvas works with real data only.
+- No fake or seeded data anywhere in the production UI.
+- Layout is clean at 375, 768, 1440 and 1920 with no horizontal scroll.
+- Contrast is AA, focus states are visible, and keyboard navigation works.
+- Lighthouse accessibility score of 90 or more.
+- List anything you guessed or could not do, instead of silently substituting.
+
+Output: the changed files, then a short summary of what changed and what you assumed.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-11-08T22:37:24+05:30.
+
+The user's current state is as follows:
+Active Document: c:\Users\amrit\Desktop\wishfor\Wishfor\src\lib\supabase.ts (LANGUAGE_UNSPECIFIED)
+Cursor is on line: 1
+</ADDITIONAL_METADATA>
