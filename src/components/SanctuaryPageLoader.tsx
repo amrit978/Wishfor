@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation';
 
 export function SanctuaryPageLoader() {
   const router = useRouter();
+  const [progress, setProgress] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
-  const [isFading, setIsFading] = useState(false);
+  const [isOpening, setIsOpening] = useState(false);
 
   useEffect(() => {
-    // 1. Detect if this visit is a browser page reload/refresh
+    // 1. Detect if this visit was triggered by a browser reload/refresh
     let isReload = false;
     try {
       const navEntries = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
@@ -22,7 +23,7 @@ export function SanctuaryPageLoader() {
       // Safe fallback
     }
 
-    // 2. If the user refreshed on any subpage, redirect back to home page
+    // 2. On browser refresh, always redirect to the home room
     if (isReload && window.location.pathname !== '/') {
       try {
         window.history.replaceState(null, '', '/');
@@ -32,18 +33,38 @@ export function SanctuaryPageLoader() {
       }
     }
 
-    // 3. Keep loading animation visible gracefully (850ms), then smoothly fade out
-    const fadeTimer = setTimeout(() => {
-      setIsFading(true);
-    }, 850);
+    // 3. Smooth 0% -> 100% counter running over ~1.3 seconds
+    const startTime = performance.now();
+    const duration = 1250; // 1.25s runtime
+    let frameId: number;
 
-    const removeTimer = setTimeout(() => {
-      setIsVisible(false);
-    }, 1350);
+    const tick = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progressFraction = Math.min(elapsed / duration, 1);
+
+      // Smooth ease-out curve
+      const eased = 1 - Math.pow(1 - progressFraction, 2.8);
+      const percent = Math.min(Math.round(eased * 100), 100);
+
+      setProgress(percent);
+
+      if (progressFraction < 1) {
+        frameId = requestAnimationFrame(tick);
+      } else {
+        // Reached 100% -> trigger smooth opening transition
+        setTimeout(() => {
+          setIsOpening(true);
+          setTimeout(() => {
+            setIsVisible(false);
+          }, 700); // 700ms smooth curtain dissolve
+        }, 120);
+      }
+    };
+
+    frameId = requestAnimationFrame(tick);
 
     return () => {
-      clearTimeout(fadeTimer);
-      clearTimeout(removeTimer);
+      if (frameId) cancelAnimationFrame(frameId);
     };
   }, [router]);
 
@@ -53,8 +74,10 @@ export function SanctuaryPageLoader() {
     <div
       aria-live="polite"
       aria-busy="true"
-      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#0c0d14] text-[#f2f2f5] select-none transition-opacity duration-500 ease-out ${
-        isFading ? 'opacity-0 pointer-events-none' : 'opacity-100'
+      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#0c0d14] text-[#f2f2f5] select-none transition-all duration-700 cubic-bezier(0.16, 1, 0.3, 1) ${
+        isOpening
+          ? 'opacity-0 scale-[1.03] pointer-events-none'
+          : 'opacity-100 scale-100'
       }`}
     >
       {/* Soft Ambient Radial Atmosphere Glow */}
@@ -62,67 +85,65 @@ export function SanctuaryPageLoader() {
         <div className="w-[500px] h-[500px] rounded-full bg-gradient-to-tr from-[#1b2344]/35 via-[#23356e]/20 to-transparent blur-3xl animate-aura-glow" />
       </div>
 
-      {/* Main Loader Content Frame */}
-      <div className="relative z-10 flex flex-col items-center text-center px-6 max-w-md animate-gentle-breath">
-        {/* Emblem with Orbital Dashed Ring */}
-        <div className="relative mb-8 flex items-center justify-center">
-          {/* Orbital Rotating Dashed Ring */}
-          <div className="absolute -inset-4 w-[84px] h-[84px] rounded-full border border-dashed border-white/15 animate-orbit-rotate pointer-events-none" />
-
-          {/* Secondary Soft Pulse Ring */}
-          <div className="absolute -inset-2 w-[68px] h-[68px] rounded-2xl bg-white/[0.02] border border-white/10 animate-aura-glow pointer-events-none" />
-
-          {/* Modern Geometric 'W' Emblem Chassis */}
-          <div className="relative w-[52px] h-[52px] rounded-[13px] border border-white/25 bg-[#13151f]/90 backdrop-blur-md flex items-center justify-center shadow-[0_0_24px_rgba(255,255,255,0.06)]">
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 20 20"
-              fill="none"
-              className="text-[#f2f2f5]"
-            >
-              <path
-                d="M3.5 5.5 L7.2 14.5 L10 8 L12.8 14.5 L16.5 5.5"
-                stroke="currentColor"
-                strokeWidth="1.9"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
+      {/* Main Center Content */}
+      <div className="relative z-10 flex flex-col items-center text-center px-6 max-w-sm">
+        {/* Modern Geometric 'W' Emblem Chassis */}
+        <div className="w-[44px] h-[44px] rounded-[11px] border border-white/20 bg-[#13151f]/80 backdrop-blur-md flex items-center justify-center mb-6 shadow-[0_0_24px_rgba(255,255,255,0.05)]">
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 20 20"
+            fill="none"
+            className="text-[#f2f2f5]"
+          >
+            <path
+              d="M3.5 5.5 L7.2 14.5 L10 8 L12.8 14.5 L16.5 5.5"
+              stroke="currentColor"
+              strokeWidth="1.9"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </div>
 
-        {/* Brand Eyebrow */}
-        <div className="flex items-center gap-2 mb-3">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-400/80 animate-pulse" />
-          <span className="font-sans text-[11px] uppercase tracking-[0.26em] text-[#7c8299] font-medium">
-            WISHFOR // SANCTUARY
+        {/* Wordmark */}
+        <div className="flex items-baseline tracking-normal mb-8">
+          <span className="font-sans font-bold text-[15px] text-[#f2f2f5] tracking-tight">
+            WISH
+          </span>
+          <span className="font-sans font-normal text-[12px] text-[#7c8299] tracking-[0.24em] ml-1.5 uppercase">
+            FOR
           </span>
         </div>
 
-        {/* Editorial Title */}
-        <h2 className="font-serif text-[22px] sm:text-[24px] font-normal tracking-tight text-[#f2f2f5] italic mb-5">
-          Entering the sanctuary...
-        </h2>
-
-        {/* Fine Animated Beam Sweep Bar */}
-        <div className="relative w-44 sm:w-52 h-[1.5px] bg-white/[0.08] rounded-full overflow-hidden mb-4">
-          <div className="absolute top-0 bottom-0 w-24 bg-gradient-to-r from-transparent via-[#e5ab37] to-transparent animate-beam-sweep" />
+        {/* Prominent 0 to 100% Counter */}
+        <div className="font-mono text-[44px] sm:text-[52px] font-light text-[#f2f2f5] tracking-tight leading-none mb-4 tabular-nums">
+          {progress}
+          <span className="text-[20px] sm:text-[24px] text-[#7c8299] font-normal ml-1">
+            %
+          </span>
         </div>
 
-        {/* Subtle Reassuring Subtitle */}
-        <p className="font-sans text-[12px] text-[#7c8299] tracking-wide font-normal max-w-xs">
-          A quiet room where everyone wears a mask.
+        {/* Minimalist Progress Line */}
+        <div className="relative w-48 sm:w-56 h-[2px] bg-white/[0.08] rounded-full overflow-hidden mb-5">
+          <div
+            className="h-full bg-gradient-to-r from-amber-400 to-[#e5ab37] transition-[width] duration-75 ease-out rounded-full shadow-[0_0_8px_rgba(229,171,55,0.4)]"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+
+        {/* Muted Subtitle */}
+        <p className="font-sans text-[11px] tracking-[0.24em] uppercase text-[#7c8299] font-medium">
+          Entering The Sanctuary
         </p>
       </div>
 
       {/* Subtle Bottom Technical Telemetry */}
       <div className="absolute bottom-8 left-0 right-0 flex justify-center pointer-events-none">
-        <span className="text-[10px] tracking-[0.28em] uppercase text-[#7c8299]/50 font-mono">
+        <span className="text-[10px] tracking-[0.28em] uppercase text-[#7c8299]/40 font-mono">
           SECURE ENCRYPTED TRANSIT · ZERO TRACE
         </span>
       </div>
     </div>
   );
 }
-

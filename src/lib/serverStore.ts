@@ -2,6 +2,7 @@ import { Post, Reply, Category, TrustLevel } from '@/types';
 import { getMaskForThread } from './anonymity';
 import { validateProblemContent, validateReplyContent } from './serverModeration';
 import { supabase, isSupabaseConfigured } from './supabase';
+import { INITIAL_POSTS } from './initialData';
 
 // In-memory server-side cache for persistence across API requests
 const serverPosts: Post[] = [];
@@ -103,6 +104,33 @@ export async function getServerPosts(filters?: {
   category?: string;
   unanswered?: boolean;
 }): Promise<Post[]> {
+  // If Supabase is configured, pull newest posts from Supabase table
+  if (isSupabaseConfigured && supabase) {
+    try {
+      let query = supabase.from('posts').select('*').order('created_at', { ascending: false });
+      if (filters?.category && filters.category !== 'All') {
+        query = query.eq('category', filters.category);
+      }
+      const { data, error } = await query;
+      if (!error && data && data.length > 0) {
+        const dbIds = new Set(data.map((p: any) => p.id));
+        const memoryPosts = serverPosts.filter((p) => !dbIds.has(p.id) && p.status === 'published');
+        let combined = [...memoryPosts, ...data];
+        if (filters?.unanswered) {
+          combined = combined.filter((p) => (p.reply_count || 0) === 0);
+        }
+        return combined;
+      }
+    } catch (e: any) {
+      console.warn('[Supabase Posts Fetch Error]:', e.message);
+    }
+  }
+
+  // Fallback: in-memory server posts initialized with baseline
+  if (serverPosts.length === 0) {
+    serverPosts.push(...INITIAL_POSTS);
+  }
+
   let list = serverPosts.filter((p) => p.status === 'published');
 
   if (filters?.category && filters.category !== 'All') {

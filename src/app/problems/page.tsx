@@ -36,6 +36,7 @@ export default function ProblemsPage() {
   useEffect(() => {
     setMounted(true);
     setPosts(communityStore.getPosts());
+    communityStore.syncWithServer();
     const unsub = communityStore.subscribe(() => {
       setPosts(communityStore.getPosts());
     });

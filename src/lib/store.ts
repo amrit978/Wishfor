@@ -144,6 +144,36 @@ class CommunityStore {
     this.notifyListeners();
   }
 
+  public async syncWithServer(): Promise<void> {
+    if (!this.isBrowser()) return;
+    try {
+      const res = await fetch('/api/posts');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.posts) && data.posts.length > 0) {
+          const localPosts = this.getRawPosts();
+          const localMap = new Map(localPosts.map((p) => [p.id, p]));
+          let updated = false;
+
+          data.posts.forEach((serverPost: Post) => {
+            if (!localMap.has(serverPost.id)) {
+              localPosts.unshift(serverPost);
+              localMap.set(serverPost.id, serverPost);
+              updated = true;
+            }
+          });
+
+          if (updated) {
+            localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(localPosts));
+            this.notifyListeners();
+          }
+        }
+      }
+    } catch {
+      // Offline or network error: fallback gracefully to local store
+    }
+  }
+
   private getRawPosts(): Post[] {
     const isDevSeed = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_DEV_SEED === 'true';
     let posts: Post[] = isDevSeed ? INITIAL_POSTS : [];
@@ -278,6 +308,21 @@ class CommunityStore {
 
     if (!data.is_draft && this.isBrowser()) {
       localStorage.setItem(STORAGE_KEYS.LAST_POST_TIME, Date.now().toString());
+
+      // Broadcast new problem to server API & Supabase
+      fetch('/api/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: data.title?.trim() || undefined,
+          body: data.body.trim(),
+          category: data.category,
+          is_urgent: Boolean(data.is_urgent),
+          is_draft: false,
+        }),
+      }).catch((err) => {
+        console.warn('[Post API Sync Warning]:', err);
+      });
     }
 
     soundEngine.playResonance();
@@ -441,6 +486,21 @@ class CommunityStore {
 
     // +1 trust point for clean advice
     this.awardTrustPoints(1);
+
+    if (this.isBrowser()) {
+      fetch('/api/replies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postId,
+          body: trimmed,
+          parentReplyId: parentReplyId || null,
+          isAsker: !!isAsker,
+        }),
+      }).catch((err) => {
+        console.warn('[Reply API Sync Warning]:', err);
+      });
+    }
 
     if (!isAsker) {
       this.addNotification({
