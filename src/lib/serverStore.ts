@@ -212,6 +212,21 @@ export async function createServerReply(data: {
     targetPost.updated_at = new Date().toISOString();
   }
 
+  // Supabase sync if configured
+  if (isSupabaseConfigured && supabase) {
+    try {
+      await supabase.from('replies').insert([newReply]);
+      if (targetPost) {
+        await supabase
+          .from('posts')
+          .update({ reply_count: targetPost.reply_count, updated_at: targetPost.updated_at })
+          .eq('id', data.postId);
+      }
+    } catch (e: any) {
+      console.warn('[Supabase Reply Sync Warning]:', e.message);
+    }
+  }
+
   return { success: true, reply: newReply };
 }
 
@@ -219,6 +234,33 @@ export async function createServerReply(data: {
  * Retrieves public replies for a post, sorted by helpful status and likes
  */
 export async function getServerReplies(postId: string): Promise<Reply[]> {
+  // If Supabase is configured, pull newest replies from Supabase
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('replies')
+        .select('*')
+        .eq('post_id', postId)
+        .eq('status', 'published');
+      if (!error && data && data.length > 0) {
+        const dbIds = new Set(data.map((r: any) => r.id));
+        const memoryReplies = serverReplies.filter(
+          (r) => r.post_id === postId && !dbIds.has(r.id) && r.status === 'published'
+        );
+        const combined = [...memoryReplies, ...data];
+        combined.sort((a, b) => {
+          if (a.is_helped && !b.is_helped) return -1;
+          if (!a.is_helped && b.is_helped) return 1;
+          if (b.like_count !== a.like_count) return b.like_count - a.like_count;
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+        return combined;
+      }
+    } catch (e: any) {
+      console.warn('[Supabase Replies Fetch Error]:', e.message);
+    }
+  }
+
   let list = serverReplies.filter((r) => r.post_id === postId && r.status === 'published');
 
   // Sort by helped status first, then likes descending
