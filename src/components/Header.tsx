@@ -327,7 +327,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
               )}
 
               {/* Profile / Verify Mask */}
-              {mounted && (user?.email || user?.phone) ? (
+              {mounted && user?.email ? (
                 <Link
                   href="/my-space"
                   onClick={() => setDropdownOpen(false)}

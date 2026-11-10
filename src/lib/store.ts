@@ -28,7 +28,7 @@ class CommunityStore {
     if (!saved) return false;
     try {
       const user: CurrentUser = JSON.parse(saved);
-      return Boolean(user && user.is_authenticated && (user.email || user.phone));
+      return Boolean(user && user.is_authenticated && user.email);
     } catch (e) {
       return false;
     }
@@ -71,7 +71,7 @@ class CommunityStore {
     const sanitized: CurrentUser = {
       ...user,
       email: cleanEmail,
-      is_authenticated: Boolean(user.is_authenticated ?? (cleanEmail || user.phone)),
+      is_authenticated: Boolean(user.is_authenticated ?? cleanEmail),
     };
     localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(sanitized));
 

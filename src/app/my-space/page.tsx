@@ -122,7 +122,7 @@ export default function MySpacePage() {
   const helpedCount = myReplies.filter((r) => r.is_helped).length;
   const totalLikesReceived = myReplies.reduce((sum, r) => sum + (r.like_count || 0), 0);
 
-  const isVerified = Boolean(user?.email || user?.phone);
+  const isVerified = Boolean(user?.email);
 
   return (
     <SplitLayout eyebrow="SANCTUARY PROFILE" title="Your Member Profile">
@@ -151,7 +151,7 @@ export default function MySpacePage() {
 
               <p className="text-[13px] text-[#7c8299] font-sans">
                 {isVerified ? (
-                  <span>Bound to <code className="text-[#aab0c4] font-mono">{user?.email ? maskIdentifier(user.email, 'email') : maskIdentifier(user?.phone || '', 'phone')}</code>. True details are never revealed.</span>
+                  <span>Bound to <code className="text-[#aab0c4] font-mono">{maskIdentifier(user?.email || '', 'email')}</code>. True details are never revealed.</span>
                 ) : (
                   <span>Guest session. Connect your email to keep your trust score across devices.</span>
                 )}
