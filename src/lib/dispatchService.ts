@@ -1,21 +1,74 @@
 import { supabase, isSupabaseConfigured } from './supabase';
+import nodemailer from 'nodemailer';
 
 export interface DispatchResult {
   delivered: boolean;
-  provider: 'resend' | 'supabase' | 'twilio' | 'fast2sms' | 'terminal_dev';
+  provider: 'gmail' | 'resend' | 'supabase' | 'twilio' | 'fast2sms' | 'terminal_dev';
   message: string;
   error?: string;
 }
 
 /**
  * Dispatches a 6-digit verification code to the user's email address
- * Supports Resend API (default high-deliverability) and Supabase Auth,
- * falling back gracefully to server audit logging if API keys are not yet set.
+ * Supports Gmail SMTP (sends to any recipient, zero domain required),
+ * Resend API, and Supabase Auth.
  */
 export async function dispatchEmail(email: string, code: string): Promise<DispatchResult> {
   const normalizedEmail = email.trim().toLowerCase();
 
-  // 1. Try Resend API (Preferred for direct transactional emails)
+  // 1. Try Gmail SMTP via Nodemailer (High-deliverability to ANY email without requiring custom domain)
+  const gmailUser = process.env.GMAIL_USER;
+  const gmailPass = process.env.GMAIL_APP_PASSWORD;
+
+  if (gmailUser && gmailPass) {
+    try {
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: gmailUser,
+          pass: gmailPass.replace(/\s+/g, ''),
+        },
+      });
+
+      await transporter.sendMail({
+        from: `"WishFor Sanctuary" <${gmailUser}>`,
+        to: normalizedEmail,
+        subject: `${code} is your WishFor verification code`,
+        html: `
+          <div style="background-color: #13151f; color: #f2f2f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px 24px; max-width: 540px; margin: 0 auto; border: 1px solid rgba(255,255,255,0.12); border-radius: 4px;">
+            <div style="font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase; color: #7c8299; margin-bottom: 20px;">
+              WISHFOR // ANONYMOUS PEER SANCTUARY
+            </div>
+            <h1 style="font-size: 26px; font-weight: normal; margin: 0 0 16px 0; color: #f2f2f5;">
+              Enter The Sanctuary
+            </h1>
+            <p style="font-size: 15px; line-height: 1.6; color: #aab0c4; margin: 0 0 28px 0;">
+              Use the verification code below to preserve your badges and access your private corner. This code expires in 5 minutes.
+            </p>
+            <div style="background-color: #0c0d14; border: 1px dashed rgba(255,255,255,0.3); border-radius: 2px; padding: 18px 24px; text-align: center; margin-bottom: 28px;">
+              <span style="font-family: monospace; font-size: 32px; letter-spacing: 0.25em; font-weight: bold; color: #e5ab37;">
+                ${code}
+              </span>
+            </div>
+            <p style="font-size: 12px; color: #7c8299; line-height: 1.5; margin: 0; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 16px;">
+              Your true email is strictly masked and will never be shared with any peer or public transmission.
+            </p>
+          </div>
+        `,
+      });
+
+      console.log(`[WISHLOG AUTH] Gmail SMTP successfully dispatched code to ${normalizedEmail}`);
+      return {
+        delivered: true,
+        provider: 'gmail',
+        message: 'Verification code sent to your email address.',
+      };
+    } catch (e: any) {
+      console.warn('[WISHLOG AUTH] Gmail SMTP exception:', e.message);
+    }
+  }
+
+  // 2. Try Resend API
   const resendApiKey = process.env.RESEND_API_KEY;
   if (resendApiKey) {
     try {
