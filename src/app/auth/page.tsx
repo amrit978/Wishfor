@@ -321,8 +321,9 @@ function AuthContent() {
           </div>
         )}
 
-        <div className="pt-8 border-t border-[rgba(255,255,255,0.10)] text-[13px] text-[#7c8299] leading-relaxed">
-          Zero identity leakage. No marketing emails, no device fingerprinting, and no public profile pages.
+        <div className="pt-8 border-t border-[rgba(255,255,255,0.10)] text-[13px] text-[#7c8299] leading-relaxed flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <span>Zero identity leakage. No marketing emails, no device fingerprinting, and no public profile pages.</span>
+          <span className="text-[11px] font-mono text-[#7c8299] shrink-0">&copy; {new Date().getFullYear()} WishFor Sanctuary</span>
         </div>
       </div>
     </SplitLayout>
