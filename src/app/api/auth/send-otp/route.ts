@@ -4,23 +4,31 @@ import { sendOtp } from '@/lib/serverAuth';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { identifier, method } = body;
+    const { identifier } = body;
+    const method = body.method || 'email';
 
-    if (!identifier || !method) {
+    if (!identifier) {
       return NextResponse.json(
-        { success: false, error: 'Identifier and method (email or phone) are required.' },
+        { success: false, error: 'Email address is required.' },
         { status: 400 }
       );
     }
 
-    if (method !== 'email' && method !== 'phone') {
+    if (method === 'phone') {
       return NextResponse.json(
-        { success: false, error: 'Method must be either "email" or "phone".' },
+        { success: false, error: 'Phone OTP has been disabled. Please verify via email.' },
         { status: 400 }
       );
     }
 
-    const result = await sendOtp(identifier, method);
+    if (method !== 'email') {
+      return NextResponse.json(
+        { success: false, error: 'Only email authentication is supported.' },
+        { status: 400 }
+      );
+    }
+
+    const result = await sendOtp(identifier, 'email');
 
     if (!result.success) {
       const status = result.error === 'RATE_LIMIT_EXCEEDED' ? 429 : result.error === 'COOLDOWN_ACTIVE' ? 429 : 400;

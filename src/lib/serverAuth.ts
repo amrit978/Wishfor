@@ -128,6 +128,15 @@ export async function sendOtp(
   identifier: string,
   method: 'email' | 'phone'
 ): Promise<{ success: boolean; message: string; waitSeconds: number; ticket?: string; devOtp?: string; error?: string }> {
+  if (method === 'phone') {
+    return {
+      success: false,
+      message: 'Phone OTP is disabled. Please verify using your email address.',
+      waitSeconds: 0,
+      error: 'PHONE_AUTH_DISABLED',
+    };
+  }
+
   const validation = validateIdentifier(identifier, method);
   if (!validation.isValid) {
     return { success: false, message: validation.error || 'Invalid identifier', waitSeconds: 0, error: validation.error };
@@ -173,18 +182,13 @@ export async function sendOtp(
     method,
   });
 
-  // Dispatch via configured channel (Gmail SMTP, Resend, Twilio, Supabase)
-  let dispatchResult: { delivered: boolean; message?: string; error?: string };
-  if (method === 'email') {
-    dispatchResult = await dispatchEmail(normalized, code);
-  } else {
-    dispatchResult = await dispatchSms(normalized, code);
-  }
+  // Dispatch via configured email channel (Gmail SMTP, Resend, Supabase)
+  const dispatchResult = await dispatchEmail(normalized, code);
 
   if (!dispatchResult.delivered) {
     return {
       success: false,
-      message: dispatchResult.error || dispatchResult.message || `Could not deliver verification code to your ${method}.`,
+      message: dispatchResult.error || dispatchResult.message || 'Could not deliver verification code to your email address.',
       waitSeconds: 0,
       error: 'DISPATCH_FAILED',
     };
@@ -192,7 +196,7 @@ export async function sendOtp(
 
   return {
     success: true,
-    message: dispatchResult.message || `Verification code sent to your ${method}. Valid for 5 minutes.`,
+    message: dispatchResult.message || 'Verification code sent to your email. Valid for 5 minutes.',
     waitSeconds: 25,
     ticket,
     devOtp: process.env.TEST_SUITE === 'true' ? code : undefined,
@@ -208,67 +212,19 @@ export async function verifyOtp(
   userCode: string,
   ticket?: string
 ): Promise<{ success: boolean; message: string; user?: CurrentUser; error?: string }> {
+  if (method === 'phone') {
+    return {
+      success: false,
+      message: 'Phone OTP is disabled. Please sign in with your email address.',
+      error: 'PHONE_AUTH_DISABLED',
+    };
+  }
+
   if (!userCode || userCode.trim().length === 0) {
     return { success: false, message: 'Please enter the 6-digit verification code.', error: 'MISSING_CODE' };
   }
 
   const normalized = normalizeIdentifier(identifier, method);
-
-  // If Twilio Verify service is enabled for phone, verify via Twilio Verify API
-  const twilioVerifySid = process.env.TWILIO_VERIFY_SERVICE_SID;
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-
-  if (method === 'phone' && twilioVerifySid && accountSid && authToken) {
-    try {
-      const authHeader = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
-      const bodyParams = new URLSearchParams({
-        To: normalized,
-        Code: userCode.trim(),
-      });
-
-      const checkRes = await fetch(
-        `https://verify.twilio.com/v2/Services/${twilioVerifySid}/VerificationCheck`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: authHeader,
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: bodyParams.toString(),
-        }
-      );
-
-      const checkData = await checkRes.json();
-      if (checkRes.ok && checkData?.status === 'approved') {
-        const userId = `u_${crypto.createHash('sha256').update(normalized).digest('hex').slice(0, 12)}`;
-        const user: CurrentUser = {
-          id: userId,
-          phone: normalized,
-          is_authenticated: true,
-          trust_score: 5,
-          trust_level: 'Listener',
-          role: 'user',
-          is_banned: false,
-        };
-        otpStore.delete(normalized);
-        return {
-          success: true,
-          message: 'Phone identity confirmed. Mask established.',
-          user,
-        };
-      } else if (checkData?.status === 'pending' || checkData?.valid === false) {
-        return {
-          success: false,
-          message: 'Incorrect verification code. Please check your SMS and try again.',
-          error: 'INCORRECT_CODE',
-        };
-      }
-    } catch (err: any) {
-      console.warn('[TWILIO VERIFY CHECK EXCEPTION]:', err.message);
-    }
-  }
-
   const record = otpStore.get(normalized);
 
   if (!record) {
@@ -286,9 +242,9 @@ export async function verifyOtp(
       if (isSupabaseConfigured && supabase) {
         try {
           await supabase.auth.verifyOtp({
-            [method]: normalized,
+            email: normalized,
             token: userCode.trim(),
-            type: method === 'email' ? 'email' : 'sms',
+            type: 'email',
           } as any);
         } catch (e: any) {
           console.warn('[Supabase Verify Note]:', e.message);
@@ -298,8 +254,7 @@ export async function verifyOtp(
       const userId = `u_${crypto.createHash('sha256').update(normalized).digest('hex').slice(0, 12)}`;
       const user: CurrentUser = {
         id: userId,
-        email: method === 'email' ? normalized : undefined,
-        phone: method === 'phone' ? normalized : undefined,
+        email: normalized,
         is_authenticated: true,
         trust_score: 5,
         trust_level: 'Listener',
@@ -369,9 +324,9 @@ export async function verifyOtp(
   if (isSupabaseConfigured && supabase) {
     try {
       await supabase.auth.verifyOtp({
-        [method]: normalized,
+        email: normalized,
         token: userCode.trim(),
-        type: method === 'email' ? 'email' : 'sms',
+        type: 'email',
       } as any);
     } catch (e: any) {
       console.warn('[Supabase Verify Note]:', e.message);
@@ -383,8 +338,7 @@ export async function verifyOtp(
 
   const user: CurrentUser = {
     id: userId,
-    email: method === 'email' ? normalized : undefined,
-    phone: method === 'phone' ? normalized : undefined,
+    email: normalized,
     is_authenticated: true,
     trust_score: 5, // Bonus for authenticating
     trust_level: 'Listener',

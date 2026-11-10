@@ -153,7 +153,7 @@ export default function MySpacePage() {
                 {isVerified ? (
                   <span>Bound to <code className="text-[#aab0c4] font-mono">{user?.email ? maskIdentifier(user.email, 'email') : maskIdentifier(user?.phone || '', 'phone')}</code>. True details are never revealed.</span>
                 ) : (
-                  <span>Guest session. Connect your email or phone to keep your trust score across devices.</span>
+                  <span>Guest session. Connect your email to keep your trust score across devices.</span>
                 )}
               </p>
             </div>

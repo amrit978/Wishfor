@@ -147,7 +147,7 @@ export async function dispatchEmail(email: string, code: string): Promise<Dispat
     return {
       delivered: false,
       provider: 'terminal_dev',
-      message: 'Could not send verification email. Please check your address or use Phone OTP.',
+      message: 'Could not send verification email. Please check your email address and try again.',
       error: 'EMAIL_DISPATCH_FAILED',
     };
   }

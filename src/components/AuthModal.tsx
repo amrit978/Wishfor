@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { communityStore } from '@/lib/store';
 import { soundEngine } from '@/lib/soundscape';
-import { COUNTRIES, DEFAULT_COUNTRY, CountryCode } from '@/lib/countryCodes';
-import { X, CheckCircle2, RotateCw, ChevronDown, Search } from 'lucide-react';
+import { X, CheckCircle2, RotateCw } from 'lucide-react';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -12,31 +11,18 @@ interface AuthModalProps {
   onSuccess?: () => void;
 }
 
-function maskIdentifier(val: string, method: 'email' | 'phone'): string {
-  if (!val) return '';
-  if (method === 'email') {
-    const parts = val.trim().split('@');
-    if (parts.length < 2) return val;
-    const name = parts[0];
-    const domain = parts[1];
-    const maskedName = name.length > 2 ? `${name[0]}***${name[name.length - 1]}` : `${name[0]}*`;
-    return `${maskedName}@${domain}`;
-  }
-  const digits = val.replace(/\D/g, '');
-  if (digits.length >= 10) {
-    return `+${digits.slice(0, digits.length - 8)}******${digits.slice(-4)}`;
-  }
-  return val;
+function maskEmail(email: string): string {
+  if (!email) return '';
+  const parts = email.trim().split('@');
+  if (parts.length < 2) return email;
+  const name = parts[0];
+  const domain = parts[1];
+  const maskedName = name.length > 2 ? `${name[0]}***${name[name.length - 1]}` : `${name[0]}*`;
+  return `${maskedName}@${domain}`;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const [method, setMethod] = useState<'email' | 'phone'>('phone');
-  const [identifier, setIdentifier] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [selectedCountry, setSelectedCountry] = useState<CountryCode>(DEFAULT_COUNTRY);
-  const [countryDropdownOpen, setCountryDropdownOpen] = useState(false);
-  const [countrySearch, setCountrySearch] = useState('');
-
+  const [email, setEmail] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [ticket, setTicket] = useState<string | null>(null);
   const [step, setStep] = useState<'input' | 'otp' | 'success'>('input');
@@ -44,20 +30,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
-
-  const countryDropdownRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (countryDropdownRef.current && !countryDropdownRef.current.contains(e.target as Node)) {
-        setCountryDropdownOpen(false);
-      }
-    };
-    if (countryDropdownOpen) {
-      document.addEventListener('mousedown', handleOutsideClick);
-    }
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, [countryDropdownOpen]);
 
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -67,16 +39,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
     return () => clearInterval(timer);
   }, [resendCooldown]);
 
-  const filteredCountries = COUNTRIES.filter((c) => {
-    const q = countrySearch.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      c.name.toLowerCase().includes(q) ||
-      c.dial_code.includes(q) ||
-      c.code.toLowerCase().includes(q)
-    );
-  });
-
   if (!isOpen) return null;
 
   const handleSendOtp = async (e: React.FormEvent) => {
@@ -85,30 +47,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
     setInfoMessage(null);
     soundEngine.playClick();
 
-    let targetIdentifier = '';
-    if (method === 'email') {
-      targetIdentifier = identifier.trim();
-      if (!targetIdentifier) {
-        setError('Please enter your email.');
-        return;
-      }
-    } else {
-      const cleanDigits = phoneNumber.trim().replace(/\D/g, '');
-      if (!cleanDigits) {
-        setError('Please enter your phone number.');
-        return;
-      }
-      targetIdentifier = `${selectedCountry.dial_code}${cleanDigits}`;
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
+      setError('Please enter your email address.');
+      return;
     }
 
-    setIdentifier(targetIdentifier);
     setIsLoading(true);
 
     try {
       const res = await fetch('/api/auth/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier: targetIdentifier, method }),
+        body: JSON.stringify({ identifier: cleanEmail, method: 'email' }),
       });
 
       const data = await res.json();
@@ -124,8 +75,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
         setTicket(data.ticket);
       }
       setStep('otp');
-      setResendCooldown(data.waitSeconds || 60);
-      setInfoMessage(data.message);
+      setResendCooldown(data.waitSeconds || 25);
+      setInfoMessage(data.message || 'Verification code sent to your inbox.');
     } catch {
       setError('Could not connect to verification server.');
     } finally {
@@ -140,13 +91,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
     soundEngine.playClick();
     setIsLoading(true);
 
-    const targetIdentifier = identifier.trim() || (method === 'email' ? identifier.trim() : `${selectedCountry.dial_code}${phoneNumber.trim()}`);
+    const cleanEmail = email.trim().toLowerCase();
 
     try {
       const res = await fetch('/api/auth/resend-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier: targetIdentifier, method }),
+        body: JSON.stringify({ identifier: cleanEmail, method: 'email' }),
       });
 
       const data = await res.json();
@@ -161,7 +112,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
       if (data.ticket) {
         setTicket(data.ticket);
       }
-      setResendCooldown(data.waitSeconds || 60);
+      setResendCooldown(data.waitSeconds || 25);
       setInfoMessage('A fresh verification code has been dispatched.');
     } catch {
       setError('Could not connect to server.');
@@ -189,8 +140,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          identifier: identifier.trim(),
-          method,
+          identifier: email.trim().toLowerCase(),
+          method: 'email',
           code: cleanCode,
           ticket,
         }),
@@ -199,7 +150,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        setError(data.message || data.error || 'Invalid code.');
+        setError(data.message || data.error || 'Invalid code. Please try again.');
         setIsLoading(false);
         return;
       }
@@ -243,146 +194,33 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
             Enter Anonymously
           </h2>
           <p className="font-sans text-[13px] text-[#aab0c4] mt-1 leading-relaxed">
-            Verify via email or SMS to preserve your trust badges. No real details are ever shown publicly.
+            Verify via email to preserve your trust badges. No real details are ever shown publicly.
           </p>
         </div>
 
         {step === 'input' && (
           <form onSubmit={handleSendOtp} className="space-y-6">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setMethod('email');
-                  setIdentifier('');
-                  setError(null);
-                }}
-                className={`px-3 py-1.5 text-[11px] uppercase tracking-[0.2em] border rounded-[2px] transition-colors ${
-                  method === 'email'
-                    ? 'border-white text-white bg-white/5'
-                    : 'border-white/20 text-[#7c8299] hover:text-white'
-                }`}
-              >
-                EMAIL
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMethod('phone');
-                  setIdentifier('');
-                  setError(null);
-                }}
-                className={`px-3 py-1.5 text-[11px] uppercase tracking-[0.2em] border rounded-[2px] transition-colors ${
-                  method === 'phone'
-                    ? 'border-white text-white bg-white/5'
-                    : 'border-white/20 text-[#7c8299] hover:text-white'
-                }`}
-              >
-                PHONE OTP
-              </button>
+            <div className="space-y-1.5">
+              <label className="block text-[11px] uppercase tracking-[0.2em] text-[#7c8299]">
+                EMAIL ADDRESS
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@domain.com"
+                className="input-underlined w-full text-[16px]"
+                autoFocus
+                required
+              />
             </div>
-
-            {method === 'email' ? (
-              <div className="space-y-1.5">
-                <label className="block text-[11px] uppercase tracking-[0.2em] text-[#7c8299]">
-                  EMAIL ADDRESS
-                </label>
-                <input
-                  type="email"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="you@domain.com"
-                  className="input-underlined w-full text-[16px]"
-                  autoFocus
-                  required
-                />
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                <label className="block text-[11px] uppercase tracking-[0.2em] text-[#7c8299]">
-                  MOBILE NUMBER WITH COUNTRY CODE
-                </label>
-                <div className="flex items-end gap-2.5 pt-1">
-                  {/* Country Selector Dropdown */}
-                  <div className="relative shrink-0" ref={countryDropdownRef}>
-                    <button
-                      type="button"
-                      onClick={() => setCountryDropdownOpen(!countryDropdownOpen)}
-                      className="h-[42px] pb-1 px-1 border-b border-white/20 hover:border-white/60 flex items-center gap-1.5 text-[15px] font-mono text-[#f2f2f5] transition-colors focus:outline-none"
-                    >
-                      <span className="text-[17px]">{selectedCountry.flag}</span>
-                      <span className="font-semibold text-[14px]">{selectedCountry.dial_code}</span>
-                      <ChevronDown
-                        size={13}
-                        className={`text-[#7c8299] transition-transform duration-200 ${
-                          countryDropdownOpen ? 'rotate-180 text-white' : ''
-                        }`}
-                      />
-                    </button>
-
-                    {countryDropdownOpen && (
-                      <div className="absolute left-0 bottom-[50px] sm:bottom-auto sm:top-[46px] w-64 max-h-64 overflow-y-auto bg-[#0c0d14]/98 border border-[rgba(255,255,255,0.18)] backdrop-blur-md shadow-2xl z-50 p-2 space-y-1">
-                        <div className="p-1 mb-1 border-b border-white/10 sticky top-0 bg-[#0c0d14] z-10 flex items-center gap-1.5">
-                          <Search size={12} className="text-[#7c8299]" />
-                          <input
-                            type="text"
-                            value={countrySearch}
-                            onChange={(e) => setCountrySearch(e.target.value)}
-                            placeholder="Search..."
-                            className="w-full bg-transparent text-xs text-white placeholder-[#7c8299] focus:outline-none py-0.5"
-                            autoFocus
-                          />
-                        </div>
-
-                        {filteredCountries.map((c) => (
-                          <button
-                            key={c.code}
-                            type="button"
-                            onClick={() => {
-                              setSelectedCountry(c);
-                              setCountryDropdownOpen(false);
-                              setCountrySearch('');
-                            }}
-                            className={`w-full flex items-center justify-between px-2 py-1.5 text-xs text-left hover:bg-white/5 transition-colors rounded-[2px] ${
-                              selectedCountry.code === c.code ? 'bg-white/10 text-[#f2f2f5]' : 'text-[#aab0c4]'
-                            }`}
-                          >
-                            <span className="flex items-center gap-1.5 truncate">
-                              <span>{c.flag}</span>
-                              <span className="truncate">{c.name}</span>
-                            </span>
-                            <span className="font-mono text-[#e5ab37] text-[11px] shrink-0 ml-1">
-                              {c.dial_code}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Phone input */}
-                  <div className="flex-1">
-                    <input
-                      type="tel"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value.replace(/[^\d]/g, ''))}
-                      placeholder=""
-                      autoComplete="off"
-                      className="input-underlined w-full text-[17px] font-mono tracking-wider"
-                      autoFocus
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
 
             {error && <p className="text-[12px] text-[#e2869a] font-sans">{error}</p>}
 
             <div className="pt-2 flex items-center justify-between">
               <button
                 type="submit"
-                disabled={isLoading || (method === 'email' ? !identifier.trim() : !phoneNumber.trim())}
+                disabled={isLoading || !email.trim()}
                 className="btn-outline !h-[44px] !px-6 text-[11px] disabled:opacity-40"
               >
                 {isLoading ? 'SENDING...' : 'SEND OTP'}
@@ -409,7 +247,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
               <div className="text-[11px] uppercase tracking-[0.18em] text-[#7c8299] flex items-center justify-between">
                 <span>6-DIGIT CODE SENT TO:</span>
                 <span className="text-[#f2f2f5] font-mono lowercase">
-                  {maskIdentifier(identifier, method)}
+                  {maskEmail(email)}
                 </span>
               </div>
               <input
@@ -464,7 +302,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                   }}
                   className="text-[11px] uppercase tracking-wider text-[#7c8299] hover:text-white"
                 >
-                  ← Change {method}
+                  ← Change Email
                 </button>
               </div>
             </div>

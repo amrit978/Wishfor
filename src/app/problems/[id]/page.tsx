@@ -482,7 +482,7 @@ export default function ProblemDetailPage() {
                   Sign in to reply to this signal
                 </p>
                 <p className="font-sans text-[15px] text-[#aab0c4] leading-relaxed">
-                  Anyone in the world can read problems freely. To contribute thoughtful advice and protect our sanctuary, please sign in with your email or phone first.
+                  Anyone in the world can read problems freely. To contribute thoughtful advice and protect our sanctuary, please sign in with your email first.
                 </p>
                 <div className="pt-2">
                   <Link
