@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Header } from '@/components/Header';
+import { Footer } from '@/components/Footer';
 import { PersistentNav } from '@/components/PersistentNav';
 import { SanctuaryPageLoader } from '@/components/SanctuaryPageLoader';
 
@@ -48,6 +49,7 @@ export default function RootLayout({
         <SanctuaryPageLoader />
         <Header />
         {children}
+        <Footer />
         <PersistentNav />
       </body>
     </html>
