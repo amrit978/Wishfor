@@ -143,6 +143,15 @@ export async function dispatchEmail(email: string, code: string): Promise<Dispat
     }
   }
 
+  if (process.env.NODE_ENV === 'production') {
+    return {
+      delivered: false,
+      provider: 'terminal_dev',
+      message: 'Could not send verification email. Please check your address or use Phone OTP.',
+      error: 'EMAIL_DISPATCH_FAILED',
+    };
+  }
+
   // 3. Server-side log (Development / Standalone mode when no API keys are configured)
   console.log(`\n======================================================`);
   console.log(`[WISHLOG AUTH SERVER DISPATCH]`);
@@ -201,6 +210,14 @@ export async function dispatchSms(phone: string, code: string): Promise<Dispatch
         };
       }
       console.warn('[WISHLOG AUTH] Twilio Verify dispatch notice:', data);
+      if (data?.code === 21608 || data?.message?.includes('unverified')) {
+        return {
+          delivered: false,
+          provider: 'twilio',
+          message: 'This mobile number is unverified on your Twilio trial account. Please use Email OTP instead.',
+          error: 'TWILIO_UNVERIFIED_NUMBER',
+        };
+      }
     } catch (e: any) {
       console.warn('[WISHLOG AUTH] Twilio Verify exception:', e.message);
     }
@@ -294,6 +311,15 @@ export async function dispatchSms(phone: string, code: string): Promise<Dispatch
     } catch (e: any) {
       console.warn('[WISHLOG AUTH] Supabase exception:', e.message);
     }
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    return {
+      delivered: false,
+      provider: 'terminal_dev',
+      message: 'SMS could not be delivered to this phone number. Please use Email OTP instead.',
+      error: 'SMS_DELIVERY_FAILED',
+    };
   }
 
   // 4. Server-side log (Development / Standalone mode when no SMS gateway is configured)

@@ -38,6 +38,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
   const [countrySearch, setCountrySearch] = useState('');
 
   const [otpCode, setOtpCode] = useState('');
+  const [ticket, setTicket] = useState<string | null>(null);
   const [step, setStep] = useState<'input' | 'otp' | 'success'>('input');
   const [error, setError] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
@@ -119,6 +120,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
         return;
       }
 
+      if (data.ticket) {
+        setTicket(data.ticket);
+      }
       setStep('otp');
       setResendCooldown(data.waitSeconds || 60);
       setInfoMessage(data.message);
@@ -154,6 +158,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
         return;
       }
 
+      if (data.ticket) {
+        setTicket(data.ticket);
+      }
       setResendCooldown(data.waitSeconds || 60);
       setInfoMessage('A fresh verification code has been dispatched.');
     } catch {
@@ -181,7 +188,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
       const res = await fetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier: identifier.trim(), method, code: cleanCode }),
+        body: JSON.stringify({
+          identifier: identifier.trim(),
+          method,
+          code: cleanCode,
+          ticket,
+        }),
       });
 
       const data = await res.json();

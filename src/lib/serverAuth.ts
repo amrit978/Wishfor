@@ -19,9 +19,9 @@ const otpStore = new Map<string, OtpRecord>();
 const rateLimitStore = new Map<string, number[]>();
 
 const OTP_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
-const RESEND_COOLDOWN_MS = 60 * 1000; // 60 seconds
-const MAX_VERIFY_ATTEMPTS = 5;
-const MAX_REQUESTS_PER_HOUR = 12;
+const RESEND_COOLDOWN_MS = 25 * 1000; // 25 seconds cooldown
+const MAX_VERIFY_ATTEMPTS = 6;
+const MAX_REQUESTS_PER_HOUR = 30; // 30 requests per hour
 const HMAC_SECRET = process.env.AUTH_SECRET || 'wishfor_sanctuary_stateless_secret_key_v1';
 
 export function createVerificationTicket(identifier: string, code: string, expiresAt: number): string {
@@ -173,17 +173,27 @@ export async function sendOtp(
     method,
   });
 
-  // Dispatch via configured channel (Resend, Twilio, Supabase, or Server Audit)
+  // Dispatch via configured channel (Gmail SMTP, Resend, Twilio, Supabase)
+  let dispatchResult: { delivered: boolean; message?: string; error?: string };
   if (method === 'email') {
-    await dispatchEmail(normalized, code);
+    dispatchResult = await dispatchEmail(normalized, code);
   } else {
-    await dispatchSms(normalized, code);
+    dispatchResult = await dispatchSms(normalized, code);
+  }
+
+  if (!dispatchResult.delivered) {
+    return {
+      success: false,
+      message: dispatchResult.error || dispatchResult.message || `Could not deliver verification code to your ${method}.`,
+      waitSeconds: 0,
+      error: 'DISPATCH_FAILED',
+    };
   }
 
   return {
     success: true,
-    message: `Verification code sent to your ${method}. Valid for 5 minutes.`,
-    waitSeconds: 60,
+    message: dispatchResult.message || `Verification code sent to your ${method}. Valid for 5 minutes.`,
+    waitSeconds: 25,
     ticket,
     devOtp: process.env.TEST_SUITE === 'true' ? code : undefined,
   };
@@ -269,8 +279,20 @@ export async function verifyOtp(
         return {
           success: false,
           message: ticketResult.error || 'Verification token could not be verified.',
-          error: 'INVALID_TOKEN',
+          error: ticketResult.error === 'Incorrect code.' ? 'INVALID_CODE' : 'INVALID_TOKEN',
         };
+      }
+
+      if (isSupabaseConfigured && supabase) {
+        try {
+          await supabase.auth.verifyOtp({
+            [method]: normalized,
+            token: userCode.trim(),
+            type: method === 'email' ? 'email' : 'sms',
+          } as any);
+        } catch (e: any) {
+          console.warn('[Supabase Verify Note]:', e.message);
+        }
       }
 
       const userId = `u_${crypto.createHash('sha256').update(normalized).digest('hex').slice(0, 12)}`;

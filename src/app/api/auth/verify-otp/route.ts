@@ -4,7 +4,7 @@ import { verifyOtp } from '@/lib/serverAuth';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { identifier, method, code } = body;
+    const { identifier, method, code, ticket: bodyTicket } = body;
 
     if (!identifier || !method || !code) {
       return NextResponse.json(
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const ticket = request.cookies.get('wishfor_otp_ticket')?.value;
+    const ticket = bodyTicket || request.cookies.get('wishfor_otp_ticket')?.value;
     const result = await verifyOtp(identifier, method, code, ticket);
 
     if (!result.success) {
