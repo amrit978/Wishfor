@@ -1,4 +1,4 @@
-import { checkDoxxing, detectCrisis } from './safety';
+import { checkDoxxing, detectCrisis, checkAbusiveContent } from './safety';
 
 export interface ServerValidationResult {
   isValid: boolean;
@@ -15,6 +15,11 @@ export function validateProblemContent(title: string | undefined, body: string):
 
   if (body.trim().length > 2000) {
     return { isValid: false, error: 'Body exceeds maximum length of 2000 characters.' };
+  }
+
+  const abuse = checkAbusiveContent(combined);
+  if (abuse.isBlocked) {
+    return { isValid: false, error: abuse.reason };
   }
 
   // Anti-doxxing check
@@ -41,6 +46,11 @@ export function validateReplyContent(body: string): ServerValidationResult {
 
   if (trimmed.length > 2000) {
     return { isValid: false, error: 'Advice exceeds maximum length of 2000 characters.' };
+  }
+
+  const abuse = checkAbusiveContent(trimmed);
+  if (abuse.isBlocked) {
+    return { isValid: false, error: abuse.reason };
   }
 
   const doxxing = checkDoxxing(trimmed);

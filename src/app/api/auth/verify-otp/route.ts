@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyOtp } from '@/lib/serverAuth';
+import { verifyOtp, createSessionToken, SESSION_COOKIE_NAME } from '@/lib/serverAuth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,6 +38,18 @@ export async function POST(request: NextRequest) {
 
     const response = NextResponse.json(result, { status: 200 });
     response.cookies.delete('wishfor_otp_ticket');
+
+    if (result.user) {
+      const sessionToken = createSessionToken(result.user);
+      response.cookies.set(SESSION_COOKIE_NAME, sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+        sameSite: 'lax',
+        path: '/',
+      });
+    }
+
     return response;
   } catch (err: any) {
     console.error('[Verify-OTP API Error]:', err);

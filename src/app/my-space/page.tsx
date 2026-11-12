@@ -61,6 +61,8 @@ export default function MySpacePage() {
   useEffect(() => {
     setMounted(true);
     loadData();
+    communityStore.syncSession();
+    communityStore.syncWithServer();
     const unsub = communityStore.subscribe(loadData);
     return () => unsub();
   }, []);
@@ -166,6 +168,19 @@ export default function MySpacePage() {
                 >
                   VERIFY ID (+5 PTS)
                 </Link>
+              ) : user?.role === 'admin' ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 text-[10px] uppercase tracking-[0.2em] font-semibold text-[#e5ab37] border border-[#e5ab37]/40 bg-[#e5ab37]/10">
+                    <ShieldCheck size={12} />
+                    <span>SANCTUARY ADMIN</span>
+                  </div>
+                  <Link
+                    href="/admin"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 text-[10px] uppercase tracking-[0.2em] font-semibold text-[#f2f2f5] border border-white/25 hover:border-[#e5ab37] hover:text-[#e5ab37] transition-colors"
+                  >
+                    <span>OPEN ADMIN CONSOLE →</span>
+                  </Link>
+                </div>
               ) : (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 text-[10px] uppercase tracking-[0.2em] font-semibold text-[#7ec89f] border border-[#7ec89f]/40 bg-[#7ec89f]/5">
                   <CheckCircle2 size={12} />

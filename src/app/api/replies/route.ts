@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
-    const { postId, body, parentReplyId, isAsker } = data;
+    const { id, postId, body, parentReplyId, isAsker } = data;
 
     if (!postId) {
       return NextResponse.json({ success: false, error: 'postId is required.' }, { status: 400 });
@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
       'unknown';
 
     const result = await createServerReply({
+      id,
       postId,
       body,
       parentReplyId,

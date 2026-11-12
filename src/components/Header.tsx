@@ -43,6 +43,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
       setLanguage(savedLang);
     }
 
+    communityStore.syncSession();
     const unsub = communityStore.subscribe(() => {
       setUser(communityStore.getCurrentUser());
     });
@@ -171,12 +172,16 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
             >
               <button
                 onClick={() => setProfileOpen(!profileOpen)}
-                className="w-[38px] h-[38px] rounded-full border border-[#7ec89f]/60 hover:border-[#7ec89f] bg-[#7ec89f]/10 flex items-center justify-center text-[#7ec89f] transition-all duration-200 focus:outline-none"
+                className={`w-[38px] h-[38px] rounded-full border flex items-center justify-center transition-all duration-200 focus:outline-none ${
+                  user?.role === 'admin'
+                    ? 'border-[#e5ab37]/70 hover:border-[#e5ab37] bg-[#e5ab37]/15 text-[#e5ab37]'
+                    : 'border-[#7ec89f]/60 hover:border-[#7ec89f] bg-[#7ec89f]/10 text-[#7ec89f]'
+                }`}
                 aria-label="User profile and account menu"
                 aria-expanded={profileOpen}
                 title={user?.email || 'Your Sanctuary Profile'}
               >
-                <User size={16} />
+                {user?.role === 'admin' ? <ShieldCheck size={16} /> : <User size={16} />}
               </button>
 
               {/* Hover / Click Dropdown Card */}
@@ -186,9 +191,13 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                   onMouseEnter={() => setProfileOpen(true)}
                 >
                   <div className="pb-3 border-b border-white/10 space-y-1">
-                    <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.2em] font-medium text-[#7ec89f]">
+                    <div
+                      className={`flex items-center gap-1.5 text-[10px] uppercase tracking-[0.2em] font-medium ${
+                        user?.role === 'admin' ? 'text-[#e5ab37]' : 'text-[#7ec89f]'
+                      }`}
+                    >
                       <ShieldCheck size={12} />
-                      <span>SANCTUARY CITIZEN</span>
+                      <span>{user?.role === 'admin' ? 'SANCTUARY ADMIN' : 'SANCTUARY CITIZEN'}</span>
                     </div>
                     <div className="font-mono text-[13px] text-white truncate" title={user?.email || ''}>
                       {user?.email || 'Logged In Member'}
@@ -199,6 +208,16 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
                   </div>
 
                   <div className="py-2 space-y-1 border-b border-white/10">
+                    {user?.role === 'admin' && (
+                      <Link
+                        href="/admin"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-2.5 px-2 py-2 text-[11px] uppercase tracking-[0.18em] text-[#e5ab37] hover:bg-[#e5ab37]/10 transition-colors font-semibold"
+                      >
+                        <ShieldCheck size={13} />
+                        <span>ADMIN CONSOLE</span>
+                      </Link>
+                    )}
                     <Link
                       href="/my-space"
                       onClick={() => setProfileOpen(false)}
@@ -313,6 +332,17 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
               >
                 <span className="tracking-wide">Community Guidelines</span>
               </Link>
+
+              {/* Admin Console Link */}
+              {mounted && user?.role === 'admin' && (
+                <Link
+                  href="/admin"
+                  onClick={() => setDropdownOpen(false)}
+                  className="block px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-[#e5ab37] hover:bg-white/[0.04] transition-colors font-semibold"
+                >
+                  Admin Console
+                </Link>
+              )}
 
               {/* Moderator Switcher (if role is moderator or mounted) */}
               {mounted && user?.role === 'moderator' && (

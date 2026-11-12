@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { CurrentUser } from '@/types';
-import { dispatchEmail, dispatchSms } from './dispatchService';
+import { dispatchEmail } from './dispatchService';
 
 export interface OtpRecord {
   code: string;
@@ -22,7 +22,98 @@ const OTP_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 const RESEND_COOLDOWN_MS = 25 * 1000; // 25 seconds cooldown
 const MAX_VERIFY_ATTEMPTS = 6;
 const MAX_REQUESTS_PER_HOUR = 30; // 30 requests per hour
+const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+export const SESSION_COOKIE_NAME = 'wishfor_session';
+
 const HMAC_SECRET = process.env.AUTH_SECRET || 'wishfor_sanctuary_stateless_secret_key_v1';
+const DEFAULT_ADMIN_EMAILS = ['amritbabudbg@gmail.com'];
+
+/**
+ * Checks whether the verified email belongs to an authorized Sanctuary Administrator.
+ */
+export function isAdminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  const configured = `${process.env.ADMIN_EMAILS || ''},${process.env.GMAIL_USER || ''}`
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  const adminSet = new Set([...DEFAULT_ADMIN_EMAILS, ...configured]);
+  return adminSet.has(email.trim().toLowerCase());
+}
+
+/**
+ * Builds a verified CurrentUser object without duplicating role/trust mapping across OTP branches.
+ */
+export function buildAuthenticatedUser(normalizedEmail: string): CurrentUser {
+  const userId = `u_${crypto.createHash('sha256').update(normalizedEmail).digest('hex').slice(0, 12)}`;
+  const isAdmin = isAdminEmail(normalizedEmail);
+
+  return {
+    id: userId,
+    email: normalizedEmail,
+    is_authenticated: true,
+    trust_score: isAdmin ? 100 : 5,
+    trust_level: isAdmin ? 'Trusted Voice' : 'Listener',
+    role: isAdmin ? 'admin' : 'user',
+    is_banned: false,
+  };
+}
+
+/**
+ * Creates an HMAC-SHA256 signed session token stored in an HTTP-only cookie.
+ */
+export function createSessionToken(user: CurrentUser): string {
+  const payload = {
+    id: user.id,
+    email: user.email || '',
+    role: user.role,
+    exp: Date.now() + SESSION_DURATION_MS,
+  };
+  const encodedPayload = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+  const signature = crypto.createHmac('sha256', HMAC_SECRET).update(encodedPayload).digest('hex');
+  return `${encodedPayload}.${signature}`;
+}
+
+/**
+ * Validates a signed HTTP-only session cookie on the server.
+ */
+export function verifySessionToken(
+  token?: string | null
+): { valid: boolean; user?: CurrentUser; isAdmin: boolean } {
+  if (!token) return { valid: false, isAdmin: false };
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 2) return { valid: false, isAdmin: false };
+    const [encodedPayload, signature] = parts;
+    const expectedSig = crypto.createHmac('sha256', HMAC_SECRET).update(encodedPayload).digest('hex');
+
+    const sigBuf = Buffer.from(signature, 'utf8');
+    const expBuf = Buffer.from(expectedSig, 'utf8');
+    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+      return { valid: false, isAdmin: false };
+    }
+
+    const parsed = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8')) as {
+      id: string;
+      email: string;
+      role: 'user' | 'moderator' | 'admin';
+      exp: number;
+    };
+
+    if (!parsed.exp || Date.now() > parsed.exp || !parsed.email) {
+      return { valid: false, isAdmin: false };
+    }
+
+    const user = buildAuthenticatedUser(parsed.email.trim().toLowerCase());
+    return {
+      valid: true,
+      user,
+      isAdmin: user.role === 'admin',
+    };
+  } catch {
+    return { valid: false, isAdmin: false };
+  }
+}
 
 export function createVerificationTicket(identifier: string, code: string, expiresAt: number): string {
   const payload = `${identifier}:${code}:${expiresAt}`;
@@ -251,20 +342,13 @@ export async function verifyOtp(
         }
       }
 
-      const userId = `u_${crypto.createHash('sha256').update(normalized).digest('hex').slice(0, 12)}`;
-      const user: CurrentUser = {
-        id: userId,
-        email: normalized,
-        is_authenticated: true,
-        trust_score: 5,
-        trust_level: 'Listener',
-        role: 'user',
-        is_banned: false,
-      };
+      const user = buildAuthenticatedUser(normalized);
 
       return {
         success: true,
-        message: 'Identity confirmed. Mask established.',
+        message: user.role === 'admin'
+          ? 'Admin identity confirmed. Sanctuary Steward access enabled.'
+          : 'Identity confirmed. Mask established.',
         user,
       };
     }
@@ -334,21 +418,13 @@ export async function verifyOtp(
   }
 
   // Construct secure anonymous user representation (never exposing PII)
-  const userId = `u_${crypto.createHash('sha256').update(normalized).digest('hex').slice(0, 12)}`;
-
-  const user: CurrentUser = {
-    id: userId,
-    email: normalized,
-    is_authenticated: true,
-    trust_score: 5, // Bonus for authenticating
-    trust_level: 'Listener',
-    role: 'user',
-    is_banned: false,
-  };
+  const user = buildAuthenticatedUser(normalized);
 
   return {
     success: true,
-    message: 'Identity confirmed. Mask established.',
+    message: user.role === 'admin'
+      ? 'Admin identity confirmed. Sanctuary Steward access enabled.'
+      : 'Identity confirmed. Mask established.',
     user,
   };
 }

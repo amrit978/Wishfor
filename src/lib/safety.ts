@@ -127,3 +127,31 @@ export function checkDoxxing(text: string): DoxxingCheckResult {
 
   return { isBlocked: false };
 }
+
+/**
+ * Blocks severe slurs, hate speech, and dehumanizing abuse on submission.
+ */
+export function checkAbusiveContent(text: string): DoxxingCheckResult {
+  if (!text) return { isBlocked: false };
+
+  const slurPatterns = [
+    /\bn[i1!|]gg[e3a@][rsz]?\b/i,
+    /\bf[a@4]gg?[o0]t[s]?\b/i,
+    /\bk[i1!]k[e3][s]?\b/i,
+    /\bch[i1!]nk[s]?\b/i,
+    /\bsp[i1!]c[s]?\b/i,
+    /\btr[a@]nn(y|ies)\b/i,
+    /\br[e3]t[a@]rd(ed|s)?\b/i,
+  ];
+
+  for (const pattern of slurPatterns) {
+    if (pattern.test(text)) {
+      return {
+        isBlocked: true,
+        reason: 'Abusive language or hate speech is strictly prohibited in the sanctuary.',
+      };
+    }
+  }
+
+  return { isBlocked: false };
+}

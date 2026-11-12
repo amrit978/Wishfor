@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, body: content, category, is_urgent, is_draft } = body;
+    const { id, title, body: content, category, is_urgent, is_draft } = body;
 
     const clientIp =
       request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
       'unknown';
 
     const result = await createServerPost({
+      id,
       title,
       body: content,
       category,

@@ -56,6 +56,8 @@ export default function ProblemDetailPage() {
 
   useEffect(() => {
     loadData();
+    communityStore.syncSession();
+    communityStore.syncWithServer();
     const unsub = communityStore.subscribe(loadData);
     return () => unsub();
   }, [id]);
@@ -77,6 +79,7 @@ export default function ProblemDetailPage() {
 
   const categoryColor = getCategoryColor(post.category);
   const isPostAuthor = Boolean(post.is_author);
+  const isAdmin = Boolean(user?.is_authenticated && user?.role === 'admin');
   const isBookmarked = bookmarks.includes(post.id);
   const crisisResult = detectCrisis(post.body + ' ' + (post.title || ''));
 
@@ -162,17 +165,41 @@ export default function ProblemDetailPage() {
     }
   };
 
-  const handleDeletePost = () => {
-    if (confirm('Are you sure you want to delete this problem permanently? This cannot be undone.')) {
-      soundEngine.playClick();
+  const handleDeletePost = async () => {
+    const promptMsg = isAdmin
+      ? 'ADMIN ACTION: Permanently delete this post from WishFor Sanctuary? This removes it for everyone.'
+      : 'Are you sure you want to delete this problem permanently? This cannot be undone.';
+    if (!confirm(promptMsg)) return;
+
+    soundEngine.playClick();
+    if (isAdmin) {
+      const res = await communityStore.adminDeletePost(post.id);
+      if (!res.success) {
+        alert(
+          res.error ||
+            'Could not permanently delete post from the database. Open /admin to check Supabase Service Role configuration.'
+        );
+        return;
+      }
+    } else {
       communityStore.deletePost(post.id);
-      router.push('/problems');
     }
+    router.push('/problems');
   };
 
-  const handleDeleteReply = (replyId: string) => {
-    if (confirm('Delete this reply permanently?')) {
-      soundEngine.playClick();
+  const handleDeleteReply = async (replyId: string) => {
+    const promptMsg = isAdmin
+      ? 'ADMIN ACTION: Permanently delete this reply from WishFor Sanctuary?'
+      : 'Delete this reply permanently?';
+    if (!confirm(promptMsg)) return;
+
+    soundEngine.playClick();
+    if (isAdmin) {
+      const res = await communityStore.adminDeleteReply(replyId);
+      if (!res.success) {
+        alert(res.error || 'Could not permanently delete reply from the database.');
+      }
+    } else {
       communityStore.deleteReply(replyId);
     }
   };
@@ -251,14 +278,19 @@ export default function ProblemDetailPage() {
               <Flag size={14} />
             </button>
 
-            {/* Delete Post (if asker) */}
-            {isPostAuthor && (
+            {/* Delete Post (asker or admin) */}
+            {(isPostAuthor || isAdmin) && (
               <button
                 onClick={handleDeletePost}
-                className="p-1.5 text-[#7c8299] hover:text-red-400 transition-colors"
-                title="Delete this problem permanently"
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.16em] border transition-colors ${
+                  isAdmin
+                    ? 'border-red-400/40 text-red-300 hover:bg-red-500/15 hover:text-red-200'
+                    : 'border-transparent text-[#7c8299] hover:text-red-400'
+                }`}
+                title={isAdmin ? 'Admin: Delete this post permanently' : 'Delete this problem permanently'}
               >
                 <Trash2 size={14} />
+                {isAdmin && <span>DELETE POST</span>}
               </button>
             )}
           </div>
@@ -349,12 +381,12 @@ export default function ProblemDetailPage() {
                           <Flag size={12} />
                         </button>
 
-                        {/* Delete Reply (if author) */}
-                        {isSelfReply && (
+                        {/* Delete Reply (if author or admin) */}
+                        {(isSelfReply || isAdmin) && (
                           <button
                             onClick={() => handleDeleteReply(reply.id)}
                             className="text-[#7c8299] hover:text-red-400 p-1 transition-colors"
-                            title="Delete reply"
+                            title={isAdmin ? 'Admin: Delete reply permanently' : 'Delete reply'}
                           >
                             <Trash2 size={12} />
                           </button>
@@ -445,10 +477,11 @@ export default function ProblemDetailPage() {
                                 <span className="text-[#7c8299]">·</span>
                                 <span className="text-[#7c8299]">{formatRelativeTime(sub.created_at)}</span>
                               </div>
-                              {sub.is_author && (
+                              {(sub.is_author || isAdmin) && (
                                 <button
                                   onClick={() => handleDeleteReply(sub.id)}
                                   className="text-[#7c8299] hover:text-red-400"
+                                  title={isAdmin ? 'Admin: Delete reply permanently' : 'Delete reply'}
                                 >
                                   <Trash2 size={11} />
                                 </button>

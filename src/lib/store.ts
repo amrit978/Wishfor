@@ -3,7 +3,7 @@
 import { Post, Reply, CurrentUser, Category, NotificationItem, ReportItem, ReportReason } from '@/types';
 import { INITIAL_POSTS, INITIAL_REPLIES, INITIAL_USERS } from './initialData';
 import { getMaskForThread, getTrustLevel } from './anonymity';
-import { checkDoxxing, detectCrisis } from './safety';
+import { checkAbusiveContent, checkDoxxing, detectCrisis } from './safety';
 import { soundEngine } from './soundscape';
 
 const STORAGE_KEYS = {
@@ -32,6 +32,11 @@ class CommunityStore {
     } catch (e) {
       return false;
     }
+  }
+
+  public isAdmin(): boolean {
+    if (!this.isAuthenticated()) return false;
+    return this.getCurrentUser().role === 'admin';
   }
 
   public getCurrentUser(): CurrentUser {
@@ -109,11 +114,39 @@ class CommunityStore {
     this.notifyListeners();
   }
 
+  public async syncSession(): Promise<{ authenticated: boolean; isAdmin: boolean; user: CurrentUser | null }> {
+    if (!this.isBrowser()) {
+      return { authenticated: false, isAdmin: false, user: null };
+    }
+    try {
+      const res = await fetch('/api/auth/session', { cache: 'no-store' });
+      if (!res.ok) {
+        return { authenticated: false, isAdmin: false, user: null };
+      }
+      const data = await res.json();
+      if (data.authenticated && data.user) {
+        const local = this.getCurrentUser();
+        if (
+          !local.is_authenticated ||
+          local.email !== data.user.email ||
+          local.role !== data.user.role
+        ) {
+          this.saveCurrentUser(data.user);
+        }
+        return { authenticated: true, isAdmin: Boolean(data.isAdmin), user: data.user };
+      }
+      return { authenticated: false, isAdmin: false, user: null };
+    } catch {
+      return { authenticated: false, isAdmin: false, user: null };
+    }
+  }
+
   public logout(): void {
     if (!this.isBrowser()) return;
     localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-    // Clear verification cookie if present
+    // Clear verification and server session cookies
     document.cookie = 'wishfor_otp_ticket=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    fetch('/api/auth/session', { method: 'DELETE' }).catch(() => {});
     this.notifyListeners();
   }
 
@@ -147,24 +180,55 @@ class CommunityStore {
   public async syncWithServer(): Promise<void> {
     if (!this.isBrowser()) return;
     try {
-      const res = await fetch('/api/posts');
+      const res = await fetch('/api/posts', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
-        if (data.success && Array.isArray(data.posts) && data.posts.length > 0) {
+        if (data.success && Array.isArray(data.posts)) {
           const localPosts = this.getRawPosts();
-          const localMap = new Map(localPosts.map((p) => [p.id, p]));
+          const serverMap = new Map((data.posts as Post[]).map((p) => [p.id, p]));
           let updated = false;
 
-          data.posts.forEach((serverPost: Post) => {
-            if (!localMap.has(serverPost.id)) {
-              localPosts.unshift(serverPost);
-              localMap.set(serverPost.id, serverPost);
+          const nextPosts: Post[] = [];
+          for (const localPost of localPosts) {
+            const serverMatch = serverMap.get(localPost.id);
+            if (serverMatch) {
+              if (
+                localPost.reply_count !== serverMatch.reply_count ||
+                localPost.status !== serverMatch.status
+              ) {
+                nextPosts.push({
+                  ...localPost,
+                  reply_count: serverMatch.reply_count,
+                  status: serverMatch.status,
+                });
+                updated = true;
+              } else {
+                nextPosts.push(localPost);
+              }
+            } else {
+              const ageMs = Date.now() - new Date(localPost.created_at).getTime();
+              if (localPost.status === 'draft' || ageMs < 20000) {
+                nextPosts.push(localPost);
+              } else {
+                updated = true;
+              }
+            }
+          }
+
+          const nextMap = new Map(nextPosts.map((p) => [p.id, p]));
+          (data.posts as Post[]).forEach((serverPost) => {
+            if (!nextMap.has(serverPost.id)) {
+              nextPosts.unshift(serverPost);
+              nextMap.set(serverPost.id, serverPost);
               updated = true;
             }
           });
 
           if (updated) {
-            localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(localPosts));
+            nextPosts.sort(
+              (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            );
+            localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(nextPosts));
             this.notifyListeners();
           }
         }
@@ -274,6 +338,11 @@ class CommunityStore {
       return { success: false, error: doxxing.reason };
     }
 
+    const abusive = checkAbusiveContent(`${data.title || ''} ${data.body}`);
+    if (abusive.isBlocked) {
+      return { success: false, error: abusive.reason };
+    }
+
     const crisis = detectCrisis(`${data.title || ''} ${data.body}`);
 
     const postId = `post_${Date.now()}`;
@@ -314,6 +383,7 @@ class CommunityStore {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: newPost.id,
           title: data.title?.trim() || undefined,
           body: data.body.trim(),
           category: data.category,
@@ -336,6 +406,74 @@ class CommunityStore {
     let replies = this.getAllReplies().filter((r) => r.post_id !== postId);
     this.saveReplies(replies);
     return true;
+  }
+
+  public async adminDeletePost(postId: string): Promise<{
+    success: boolean;
+    deletedFromDb?: boolean;
+    requiresServiceRole?: boolean;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch('/api/admin/posts', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return {
+          success: false,
+          deletedFromDb: Boolean(data.deletedFromDb),
+          requiresServiceRole: Boolean(data.requiresServiceRole),
+          error: data.error || 'Unable to delete post from server.',
+        };
+      }
+      this.deletePost(postId);
+      return {
+        success: true,
+        deletedFromDb: Boolean(data.deletedFromDb),
+      };
+    } catch {
+      return {
+        success: false,
+        error: 'Network error communicating with admin endpoint.',
+      };
+    }
+  }
+
+  public async adminDeleteReply(replyId: string): Promise<{
+    success: boolean;
+    deletedFromDb?: boolean;
+    requiresServiceRole?: boolean;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch('/api/admin/posts', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ replyId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return {
+          success: false,
+          deletedFromDb: Boolean(data.deletedFromDb),
+          requiresServiceRole: Boolean(data.requiresServiceRole),
+          error: data.error || 'Unable to delete reply from server.',
+        };
+      }
+      this.deleteReply(replyId);
+      return {
+        success: true,
+        deletedFromDb: Boolean(data.deletedFromDb),
+      };
+    } catch {
+      return {
+        success: false,
+        error: 'Network error communicating with admin endpoint.',
+      };
+    }
   }
 
   public getRepliesForPost(postId: string): Reply[] {
@@ -437,6 +575,11 @@ class CommunityStore {
       return { success: false, error: doxxing.reason };
     }
 
+    const abusive = checkAbusiveContent(trimmed);
+    if (abusive.isBlocked) {
+      return { success: false, error: abusive.reason };
+    }
+
     const post = this.getPostById(postId);
     if (!post) {
       return { success: false, error: 'Transmission thread has terminated.' };
@@ -492,6 +635,7 @@ class CommunityStore {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: newReply.id,
           postId,
           body: trimmed,
           parentReplyId: parentReplyId || null,
