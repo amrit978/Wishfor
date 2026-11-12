@@ -12,7 +12,7 @@ export const Footer: React.FC = () => {
           <span className="text-[#8e95ad]">Zero data sales &bull; No tracking cookies</span>
         </div>
         <p className="text-[12px] text-[#656c82]">
-          Created for quiet honesty, respectful perspective, and communal healing.
+          Created for quiet honesty, respectful perspective, and communal healing by <a href="https://github.com/amrit978">amrit</a>.
         </p>
       </div>
     </footer>
